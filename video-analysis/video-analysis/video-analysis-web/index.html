@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Video Downloader</title>
+    <style>
+      :root {
+        --primary-color: #646cff;
+        --primary-hover: #535bf2;
+        --bg-color: #1a1a1a;
+        --card-bg: #242424;
+        --text-color: rgba(255, 255, 255, 0.87);
+        --text-muted: rgba(255, 255, 255, 0.6);
+        --border-color: rgba(255, 255, 255, 0.1);
+        --success-color: #10b981;
+        --error-color: #ef4444;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+          Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        min-height: 100vh;
+      }
+
+      #app {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
+
+      .card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 1.5rem;
+        border: 1px solid var(--border-color);
+      }
+
+      .title {
+        font-size: 2rem;
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(135deg, var(--primary-color), #a855f7);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .subtitle {
+        text-align: center;
+        color: var(--text-muted);
+        margin-bottom: 2rem;
+      }
+
+      .form-group {
+        margin-bottom: 1.5rem;
+      }
+
+      .form-label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: var(--text-muted);
+      }
+
+      .form-select,
+      .form-input {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        background: var(--bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-color);
+        transition: border-color 0.2s, box-shadow 0.2s;
+      }
+
+      .form-select:focus,
+      .form-input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(100, 108, 255, 0.2);
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        gap: 0.5rem;
+      }
+
+      .btn-primary {
+        width: 100%;
+        background: var(--primary-color);
+        color: white;
+      }
+
+      .btn-primary:hover:not(:disabled) {
+        background: var(--primary-hover);
+        transform: translateY(-1px);
+      }
+
+      .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .result-card {
+        margin-top: 1.5rem;
+      }
+
+      .result-success {
+        border-left: 4px solid var(--success-color);
+      }
+
+      .result-error {
+        border-left: 4px solid var(--error-color);
+      }
+
+      .result-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .result-info {
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .result-row {
+        display: flex;
+        gap: 1rem;
+      }
+
+      .result-label {
+        color: var(--text-muted);
+        min-width: 80px;
+      }
+
+      .result-value {
+        flex: 1;
+        word-break: break-all;
+      }
+
+      .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid var(--border-color);
+        border-top-color: var(--primary-color);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        display: inline-block;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .quality-options {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .quality-option {
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text-color);
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .quality-option:hover {
+        border-color: var(--primary-color);
+      }
+
+      .quality-option.active {
+        background: var(--primary-color);
+        border-color: var(--primary-color);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="container">
+        <header>
+          <h1 class="title">Video Downloader</h1>
+          <p class="subtitle">支持 YouTube / TikTok / Bilibili / 小红书</p>
+        </header>
+
+        <div class="card">
+          <form @submit.prevent="handleSubmit">
+            <!-- 平台选择 -->
+            <div class="form-group">
+              <label class="form-label">选择平台</label>
+              <select v-model="selectedPlatform" class="form-select">
+                <option value="" disabled>请选择平台</option>
+                <option v-for="p in platforms" :key="p.value" :value="p.value">
+                  {{ p.name }}
+                </option>
+              </select>
+            </div>
+
+            <!-- URL输入 -->
+            <div class="form-group">
+              <label class="form-label">视频链接</label>
+              <input
+                v-model="videoUrl"
+                type="text"
+                class="form-input"
+                placeholder="粘贴视频URL..."
+                :disabled="status === 'loading'"
+              />
+            </div>
+
+            <!-- 画质选择 -->
+            <div class="form-group">
+              <label class="form-label">画质</label>
+              <div class="quality-options">
+                <button
+                  v-for="q in qualityOptions"
+                  :key="q.value"
+                  type="button"
+                  class="quality-option"
+                  :class="{ active: quality === q.value }"
+                  @click="quality = q.value"
+                >
+                  {{ q.label }}
+                </button>
+              </div>
+            </div>
+
+            <!-- 提交按钮 -->
+            <button type="submit" class="btn btn-primary" :disabled="status === 'loading'">
+              <span v-if="status === 'loading'" class="spinner"></span>
+              {{ status === 'loading' ? '下载中...' : '开始下载' }}
+            </button>
+          </form>
+        </div>
+
+        <!-- 结果展示 -->
+        <div v-if="result" class="card result-card" :class="result.success ? 'result-success' : 'result-error'">
+          <h3 class="result-title">
+            <span v-if="result.success">&#10003;</span>
+            <span v-else>&#10007;</span>
+            {{ result.success ? '下载成功' : '下载失败' }}
+          </h3>
+
+          <div v-if="result.success && result.video_info" class="result-info">
+            <div class="result-row">
+              <span class="result-label">标题</span>
+              <span class="result-value">{{ result.video_info.title }}</span>
+            </div>
+            <div v-if="result.video_info.author" class="result-row">
+              <span class="result-label">作者</span>
+              <span class="result-value">{{ result.video_info.author }}</span>
+            </div>
+            <div class="result-row">
+              <span class="result-label">时长</span>
+              <span class="result-value">{{ formatDuration(result.video_info.duration) }}</span>
+            </div>
+            <div v-if="result.file_size_human" class="result-row">
+              <span class="result-label">文件大小</span>
+              <span class="result-value">{{ result.file_size_human }}</span>
+            </div>
+            <div v-if="result.elapsed_time" class="result-row">
+              <span class="result-label">耗时</span>
+              <span class="result-value">{{ result.elapsed_time.toFixed(1) }}秒</span>
+            </div>
+            <div v-if="result.file_path" class="result-row">
+              <span class="result-label">保存位置</span>
+              <span class="result-value">{{ result.file_path }}</span>
+            </div>
+          </div>
+
+          <div v-if="!result.success" class="result-info">
+            <p>{{ result.message }}</p>
+          </div>
+        </div>
+
+        <!-- 错误提示 -->
+        <div v-if="errorMessage && !result" class="card result-card result-error">
+          <h3 class="result-title">&#10007; 错误</h3>
+          <p>{{ errorMessage }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CDN 加载 Vue 3 和 axios -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+    <script>
+      // 自动检测 API 地址：从后端打开用相对路径，双击 HTML 文件用绝对路径
+      var API_BASE = window.location.protocol === 'file:'
+        ? 'http://localhost:8000/api'
+        : '/api';
+
+      var app = Vue.createApp({
+        data: function () {
+          return {
+            platforms: [],
+            selectedPlatform: '',
+            videoUrl: '',
+            quality: 'best',
+            status: 'idle',
+            result: null,
+            errorMessage: '',
+            qualityOptions: [
+              { value: 'best', label: '最佳画质' },
+              { value: '1080p', label: '1080P' },
+              { value: '720p', label: '720P' },
+              { value: '480p', label: '480P' },
+            ],
+          };
+        },
+        mounted: function () {
+          var vm = this;
+          axios.get(API_BASE + '/platforms', { timeout: 10000 })
+            .then(function (resp) {
+              vm.platforms = resp.data.platforms;
+              if (vm.platforms.length > 0) {
+                vm.selectedPlatform = vm.platforms[0].value;
+              }
+            })
+            .catch(function (e) {
+              console.error('加载平台列表失败:', e);
+              vm.errorMessage = '无法连接后端服务，请确认已启动 python run_server.py';
+            });
+        },
+        methods: {
+          formatDuration: function (seconds) {
+            if (!seconds) return '-';
+            var h = Math.floor(seconds / 3600);
+            var m = Math.floor((seconds % 3600) / 60);
+            var s = seconds % 60;
+            if (h > 0) {
+              return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+            }
+            return m + ':' + String(s).padStart(2, '0');
+          },
+          handleSubmit: function () {
+            if (!this.videoUrl.trim()) {
+              this.errorMessage = '请输入视频URL';
+              return;
+            }
+
+            var vm = this;
+            vm.status = 'loading';
+            vm.result = null;
+            vm.errorMessage = '';
+
+            axios.post(API_BASE + '/download', {
+              url: vm.videoUrl.trim(),
+              platform: vm.selectedPlatform,
+              quality: vm.quality,
+              audio_only: false,
+            }, { timeout: 300000 })
+              .then(function (resp) {
+                vm.result = resp.data;
+                vm.status = resp.data.success ? 'success' : 'error';
+                if (!resp.data.success) {
+                  vm.errorMessage = resp.data.message;
+                }
+              })
+              .catch(function (e) {
+                vm.status = 'error';
+                vm.errorMessage = (e.response && e.response.data && e.response.data.detail) || e.message || '下载失败';
+              });
+          },
+        },
+      });
+
+      app.mount('#app');
+    </script>
+  </body>
+</html>

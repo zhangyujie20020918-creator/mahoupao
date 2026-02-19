@@ -1,0 +1,14 @@
+# 核心依赖
+yt-dlp>=2024.1.0         # 视频下载引擎
+aiohttp>=3.9.0           # 异步HTTP客户端
+click>=8.1.0             # 命令行框架
+rich>=13.7.0             # 美化输出和进度条
+
+# API框架
+fastapi>=0.109.0         # Web API框架
+uvicorn[standard]>=0.27.0  # ASGI服务器
+python-multipart>=0.0.6  # 文件上传支持
+
+# 可选依赖（用于高级功能）
+# playwright>=1.40.0     # 动态页面渲染（小红书备用方案）
+# browser-cookie3>=0.19  # 浏览器Cookie读取

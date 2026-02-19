@@ -1,0 +1,2 @@
+[console_scripts]
+video-dl = src.main:main

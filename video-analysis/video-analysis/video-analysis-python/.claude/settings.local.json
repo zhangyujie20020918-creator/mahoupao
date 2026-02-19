@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c:*)",
+      "Bash(python test_download.py:*)",
+      "Bash(python -m src.main:*)"
+    ]
+  }
+}
