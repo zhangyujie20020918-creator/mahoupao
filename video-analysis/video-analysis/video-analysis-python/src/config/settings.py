@@ -9,11 +9,12 @@ import os
 
 
 def _get_default_output_dir() -> Path:
-    """获取默认下载目录（项目根目录下的downloads）"""
-    # 获取项目根目录
+    """获取默认下载目录（video-analysis根目录下的downloads）"""
+    # 获取 video-analysis 根目录
     current_file = Path(__file__).resolve()
-    project_root = current_file.parent.parent.parent  # src/config/settings.py -> project root
-    return project_root / "downloads"
+    # src/config/settings.py -> video-analysis-python -> video-analysis -> downloads
+    video_analysis_root = current_file.parent.parent.parent.parent
+    return video_analysis_root / "downloads"
 
 
 @dataclass

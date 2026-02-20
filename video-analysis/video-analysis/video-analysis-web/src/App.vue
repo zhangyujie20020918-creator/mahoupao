@@ -21,12 +21,17 @@ const streamPhase = ref<string>('')
 const streamTotal = ref(0)
 const streamSucceeded = ref(0)
 const streamFailed = ref(0)
+const streamSkipped = ref(0)  // 跳过已存在的视频数量
 const streamRemaining = ref(0)
 const streamElapsed = ref(0)
 const streamFolderPath = ref('')
 const streamSkippedVideos = ref<Array<{ url: string; title: string; error: string }>>([])
 const streamAbort = ref<AbortController | null>(null)
 const progressListEl = ref<HTMLElement | null>(null)
+// 作品/视频计数
+const streamWorkCount = ref(0)
+const streamNonVideoCount = ref(0)
+const streamUsername = ref('')
 
 // 是否为用户主页URL
 const isUserProfileUrl = computed(() => videoUrl.value.includes('/user/'))
@@ -91,10 +96,14 @@ function resetStreamState() {
   streamTotal.value = 0
   streamSucceeded.value = 0
   streamFailed.value = 0
+  streamSkipped.value = 0
   streamRemaining.value = 0
   streamElapsed.value = 0
   streamFolderPath.value = ''
   streamSkippedVideos.value = []
+  streamWorkCount.value = 0
+  streamNonVideoCount.value = 0
+  streamUsername.value = ''
   if (streamAbort.value) {
     streamAbort.value.abort()
     streamAbort.value = null
@@ -142,6 +151,8 @@ async function handleSubmit() {
             streamPhase.value = 'downloading'
             streamTotal.value = event.total || 0
             streamRemaining.value = event.total || 0
+            streamWorkCount.value = event.work_count || 0
+            streamNonVideoCount.value = event.non_video_count || 0
             break
           case 'downloading':
             if (event.succeeded_so_far !== undefined) {
@@ -153,7 +164,12 @@ async function handleSubmit() {
             break
           case 'downloaded':
             if (event.success) {
-              streamSucceeded.value = event.succeeded_so_far ?? (streamSucceeded.value + 1)
+              if (event.skipped === true) {
+                // 跳过已存在的视频
+                streamSkipped.value = event.skipped_count ?? (streamSkipped.value + 1)
+              } else {
+                streamSucceeded.value = event.succeeded_so_far ?? (streamSucceeded.value + 1)
+              }
               streamRemaining.value = event.remaining ?? streamRemaining.value
             } else if (event.permanently_failed) {
               streamFailed.value++
@@ -165,10 +181,14 @@ async function handleSubmit() {
             streamPhase.value = 'done'
             streamSucceeded.value = event.succeeded || 0
             streamFailed.value = event.failed || 0
+            streamSkipped.value = typeof event.skipped === 'number' ? event.skipped : 0
             streamElapsed.value = event.elapsed_time || 0
             streamFolderPath.value = event.folder_path || ''
             streamSkippedVideos.value = event.skipped_videos || []
-            status.value = (event.succeeded || 0) > 0 ? 'success' : 'error'
+            streamWorkCount.value = event.work_count || 0
+            streamNonVideoCount.value = event.non_video_count || 0
+            streamUsername.value = event.username || ''
+            status.value = (event.succeeded || 0) > 0 || streamSkipped.value > 0 ? 'success' : 'error'
             streamAbort.value = null
             break
           case 'error':
@@ -251,7 +271,14 @@ async function handleSubmit() {
         正在提取视频链接...
       </div>
       <div v-if="streamPhase === 'downloading' || streamPhase === 'done'" class="phase-banner phase-downloading">
-        已提取 {{ streamTotal }} 个视频 | 已下载 {{ streamSucceeded }}/{{ streamTotal }}
+        <template v-if="streamWorkCount > streamTotal">
+          作品 {{ streamWorkCount }} 个 | 视频 {{ streamTotal }} 个 | 下载 {{ streamSucceeded }}/{{ streamTotal }}
+          <span v-if="streamSkipped > 0" class="text-muted"> (跳过 {{ streamSkipped }})</span>
+        </template>
+        <template v-else>
+          已提取 {{ streamTotal }} 个视频 | 已下载 {{ streamSucceeded }}/{{ streamTotal }}
+          <span v-if="streamSkipped > 0" class="text-muted"> (跳过 {{ streamSkipped }})</span>
+        </template>
       </div>
 
       <div v-if="currentDownloading && streamPhase === 'downloading'" class="current-download">
@@ -270,16 +297,17 @@ async function handleSubmit() {
           :key="idx"
           class="progress-item"
           :class="[
-            item.success ? 'progress-item-ok' : 'progress-item-fail',
+            item.success ? (item.skipped ? 'progress-item-skip' : 'progress-item-ok') : 'progress-item-fail',
             item.permanently_failed ? 'progress-item-skipped' : ''
           ]"
         >
           <span class="progress-item-idx">{{ item.index }}</span>
-          <span class="progress-item-icon">{{ item.success ? '\u2713' : (item.permanently_failed ? '\u2716' : '\u21BB') }}</span>
+          <span class="progress-item-icon">{{ item.success ? (item.skipped ? '\u21E2' : '\u2713') : (item.permanently_failed ? '\u2716' : '\u21BB') }}</span>
           <div class="progress-item-body">
             <div class="progress-item-title">{{ item.title || '未知' }}</div>
             <div v-if="item.file_path" class="progress-item-path">{{ item.file_path }}</div>
             <div v-if="item.file_size_human" class="progress-item-size">{{ item.file_size_human }}</div>
+            <div v-if="item.skipped" class="progress-item-size text-muted">(已存在)</div>
             <div v-if="!item.success && item.error" class="progress-item-error">{{ item.error }}</div>
           </div>
         </div>
@@ -287,9 +315,22 @@ async function handleSubmit() {
 
       <!-- 完成汇总 -->
       <div v-if="streamPhase === 'done'" class="phase-summary">
+        <div v-if="streamUsername" class="summary-username">
+          用户: {{ streamUsername }}
+        </div>
+        <div v-if="streamWorkCount > streamTotal" class="summary-counts">
+          <span>作品 {{ streamWorkCount }} 个</span>
+          <span class="text-muted"> | </span>
+          <span>视频 {{ streamTotal }} 个</span>
+          <span v-if="streamNonVideoCount > 0" class="text-muted"> | 图文 {{ streamNonVideoCount }} 个</span>
+        </div>
         <div class="summary-row">
-          <span>成功</span>
+          <span>新下载</span>
           <strong class="text-success">{{ streamSucceeded }}</strong>
+        </div>
+        <div v-if="streamSkipped > 0" class="summary-row">
+          <span>已存在跳过</span>
+          <strong class="text-muted">{{ streamSkipped }}</strong>
         </div>
         <div class="summary-row">
           <span>失败</span>

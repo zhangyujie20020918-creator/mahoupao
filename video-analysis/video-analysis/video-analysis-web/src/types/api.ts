@@ -81,6 +81,12 @@ export interface StreamEvent {
   succeeded_so_far?: number
   remaining?: number
   skipped_videos?: Array<{ url: string; title: string; error: string }>
+  // 作品/视频区分
+  work_count?: number
+  non_video_count?: number
+  skipped?: number | boolean  // done 事件中是数量，downloaded 事件中是布尔值
+  skipped_count?: number
+  username?: string
 }
 
 export type DownloadStatus = 'idle' | 'loading' | 'success' | 'error'

@@ -10,6 +10,7 @@ import shutil
 import time
 import json
 import os
+import random
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
@@ -27,6 +28,173 @@ class DouyinDownloader(IDownloader):
 
     # 独立 profile 目录，避免与正在运行的系统浏览器争抢文件锁
     PROFILE_DIR = Path(os.path.expandvars(r"%LocalAppData%\video-analysis\chrome-profile"))
+
+    # 日志目录 - 保存调试信息
+    LOG_DIR = Path(__file__).parent.parent.parent.parent / "logs"
+
+    # ========== 反爬配置 ==========
+    # 最大单次延迟 2.5 秒
+    SCROLL_DELAY = (1.0, 2.0)       # 滚动间隔（秒）
+    PAGE_LOAD_DELAY = (1.5, 2.5)    # 页面加载后等待（秒）
+    VIDEO_INTERVAL = (0.8, 1.8)     # 视频之间间隔（秒）
+
+    @staticmethod
+    def _random_delay(delay_range: tuple) -> int:
+        """生成随机延迟时间（毫秒）"""
+        return int(random.uniform(delay_range[0], delay_range[1]) * 1000)
+
+    @staticmethod
+    async def _check_captcha(page) -> tuple[bool, str]:
+        """
+        检测页面是否出现验证码或登录弹窗
+
+        Returns:
+            (是否有验证码/登录, 类型描述)
+        """
+        # 按优先级检测
+        checks = [
+            # 登录弹窗 - 优先检测
+            ('div[class*="login-panel"]', '登录弹窗'),
+            ('div[class*="loginContainer"]', '登录弹窗'),
+            ('div[class*="login-guide"]', '登录弹窗'),
+            ('div.login-mask', '登录弹窗'),
+            # 验证码
+            ('div.captcha_verify_container', '滑块验证码'),
+            ('div[class*="captcha-verify"]', '滑块验证码'),
+            ('div#captcha_container', '验证码'),
+            ('div.verify-captcha-container', '图片验证码'),
+            ('div[class*="secsdk-captcha"]', '安全验证码'),
+            ('div[class*="captcha"]', '验证码'),
+            ('iframe[src*="captcha"]', '验证码'),
+            # 海外访问提示
+            ('div[class*="region"]', '地区限制提示'),
+        ]
+        for selector, block_type in checks:
+            try:
+                elem = await page.query_selector(selector)
+                if elem and await elem.is_visible():
+                    return True, block_type
+            except Exception:
+                pass
+        return False, ""
+
+    async def _wait_for_auth_resolved(self, page, max_wait: int = 120) -> bool:
+        """
+        等待用户完成验证码/登录，最多等待 max_wait 秒
+        每次检测到阻断会记录日志
+        """
+        start = time.time()
+        last_type = ""
+        while time.time() - start < max_wait:
+            has_block, block_type = await self._check_captcha(page)
+            if not has_block:
+                return True
+            # 类型变化时记录日志
+            if block_type != last_type:
+                print(f"[抖音下载] ⏳ 等待用户完成: {block_type}")
+                last_type = block_type
+            await page.wait_for_timeout(1000)
+        return False
+
+    async def _wait_and_retry_auth(self, page, max_retries: int = 10) -> bool:
+        """
+        循环检测验证码/登录，直到页面正常或达到最大重试次数
+        验证码和登录可能反复出现，每次检测到等待 10-12 秒后重试
+
+        Returns:
+            True 如果最终通过，False 如果超时
+        """
+        for attempt in range(max_retries):
+            has_block, block_type = await self._check_captcha(page)
+
+            if not has_block:
+                if attempt > 0:
+                    print(f"[抖音下载] ✓ 验证/登录已全部完成")
+                return True
+
+            # 检测到阻断，记录并等待用户处理
+            print(f"[抖音下载] ⚠️ 检测到 {block_type}！请在浏览器中完成... (第{attempt+1}次)")
+
+            # 等待用户完成（最多120秒）
+            resolved = await self._wait_for_auth_resolved(page, 120)
+            if not resolved:
+                print(f"[抖音下载] ✗ 等待超时")
+                return False
+
+            print(f"[抖音下载] ✓ {block_type} 已通过")
+
+            # 等待 10-12 秒让页面刷新，可能还有下一个验证
+            wait_time = random.uniform(10, 12)
+            print(f"[抖音下载] 等待页面刷新 ({wait_time:.1f}s)...")
+            await page.wait_for_timeout(int(wait_time * 1000))
+
+        return False
+
+    async def _save_debug_info(self, page, reason: str = "unknown") -> None:
+        """保存调试信息：截图 + 页面源代码"""
+        timestamp = int(time.time())
+
+        # 确保日志目录存在
+        self.LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+        # 保存截图
+        screenshot_path = self.LOG_DIR / f"debug_{reason}_{timestamp}.png"
+        try:
+            await page.screenshot(path=str(screenshot_path))
+            print(f"[抖音下载] 📸 已保存截图: {screenshot_path}")
+        except Exception as e:
+            print(f"[抖音下载] 截图保存失败: {e}")
+
+        # 保存页面源代码
+        html_path = self.LOG_DIR / f"debug_{reason}_{timestamp}.html"
+        try:
+            content = await page.content()
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            print(f"[抖音下载] 📄 已保存源代码: {html_path}")
+        except Exception as e:
+            print(f"[抖音下载] 源代码保存失败: {e}")
+
+        # 打印页面基本信息
+        try:
+            title = await page.title()
+            current_url = page.url
+            print(f"[抖音下载] 页面标题: {title}")
+            print(f"[抖音下载] 当前URL: {current_url}")
+        except Exception:
+            pass
+
+    def _save_video_urls_log(self, user_url: str, video_urls: list[str]) -> Path:
+        """
+        保存提取的视频URL列表到调试日志文件
+
+        Args:
+            user_url: 用户主页URL
+            video_urls: 提取的视频URL列表
+
+        Returns:
+            日志文件路径
+        """
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_path = self.LOG_DIR / f"video_urls_{timestamp}.txt"
+
+        try:
+            self.LOG_DIR.mkdir(parents=True, exist_ok=True)
+            with open(log_path, "w", encoding="utf-8") as f:
+                f.write(f"# 抖音视频URL提取日志\n")
+                f.write(f"# 时间: {datetime.now().isoformat()}\n")
+                f.write(f"# 用户主页: {user_url}\n")
+                f.write(f"# 视频数量: {len(video_urls)}\n")
+                f.write(f"# {'='*50}\n\n")
+
+                for i, url in enumerate(video_urls, 1):
+                    f.write(f"{i:03d}. {url}\n")
+
+            print(f"[抖音下载] 📝 已保存视频URL列表: {log_path}")
+            return log_path
+        except Exception as e:
+            print(f"[抖音下载] ⚠️ 保存URL列表失败: {e}")
+            return log_path
 
     def __init__(self):
         self.settings = get_settings()
@@ -46,10 +214,44 @@ class DouyinDownloader(IDownloader):
             "iesdouyin.com",
         ]
 
+    # 抖音有效链接正则
+    VIDEO_URL_PATTERN = re.compile(r'douyin\.com/video/\d+')
+    USER_URL_PATTERN = re.compile(r'douyin\.com/user/[A-Za-z0-9_-]+')
+    SHORT_URL_PATTERN = re.compile(r'v\.douyin\.com/[A-Za-z0-9]+')
+
     @staticmethod
     def is_user_profile_url(url: str) -> bool:
         """检查是否为用户主页URL"""
         return "/user/" in url
+
+    @classmethod
+    def validate_url(cls, url: str) -> tuple[bool, str]:
+        """
+        验证抖音链接格式是否有效
+
+        Returns:
+            (is_valid, error_message)
+        """
+        # 检查是否为抖音域名
+        if not any(domain in url.lower() for domain in ["douyin.com", "iesdouyin.com"]):
+            return False, "不是抖音链接"
+
+        # 检查是否为有效格式
+        if cls.VIDEO_URL_PATTERN.search(url):
+            return True, ""
+        if cls.USER_URL_PATTERN.search(url):
+            return True, ""
+        if cls.SHORT_URL_PATTERN.search(url):
+            return True, ""
+
+        # 无效格式，给出提示
+        return False, (
+            "抖音链接格式不正确。支持的格式：\n"
+            "  • 视频链接: https://www.douyin.com/video/7456789012345678901\n"
+            "  • 用户主页: https://www.douyin.com/user/MS4wLjABAAAAxxxxx\n"
+            "  • 短链接: https://v.douyin.com/xxxxxx\n"
+            "当前链接不符合以上格式，请检查后重试。"
+        )
 
     def supports_url(self, url: str) -> bool:
         url_lower = url.lower()
@@ -68,13 +270,15 @@ class DouyinDownloader(IDownloader):
         return ""
 
     def _get_chrome_path(self) -> Optional[str]:
-        """获取本地 Chrome/Edge 浏览器路径"""
+        """获取本地 Chrome/Edge 浏览器路径（优先 Chrome）"""
         possible_paths = [
-            os.path.expandvars(r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"),
-            os.path.expandvars(r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"),
+            # Chrome 优先
             os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
             os.path.expandvars(r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"),
             os.path.expandvars(r"%LocalAppData%\Google\Chrome\Application\chrome.exe"),
+            # Edge 备用
+            os.path.expandvars(r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"),
+            os.path.expandvars(r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"),
         ]
         for path in possible_paths:
             if os.path.exists(path):
@@ -82,27 +286,45 @@ class DouyinDownloader(IDownloader):
         return None
 
     def _get_native_user_data_dir(self) -> Optional[Path]:
-        """获取系统浏览器的用户数据目录（与 _get_chrome_path 同序，保证对应）"""
+        """获取系统浏览器的用户数据目录（优先 Chrome，与 _get_chrome_path 保持一致）"""
         candidates = [
-            Path(os.path.expandvars(r"%LocalAppData%\Microsoft\Edge\User Data")),
+            # Chrome 优先
             Path(os.path.expandvars(r"%LocalAppData%\Google\Chrome\User Data")),
+            # Edge 备用
+            Path(os.path.expandvars(r"%LocalAppData%\Microsoft\Edge\User Data")),
         ]
         for p in candidates:
             if (p / "Default").exists():
                 return p
         return None
 
-    def _sync_native_profile(self) -> None:
+    def _is_profile_initialized(self) -> bool:
+        """检查 Profile 是否已初始化（已有登录态）"""
+        cookies_file = self.PROFILE_DIR / "Default" / "Network" / "Cookies"
+        local_state = self.PROFILE_DIR / "Local State"
+        return cookies_file.exists() and local_state.exists()
+
+    def _sync_native_profile(self, force: bool = False) -> None:
         """
         将系统浏览器（Edge/Chrome）的配置、登录态、网站缓存同步到独立 profile 目录。
-        系统浏览器运行时 User Data 目录有文件锁，无法直接共用，
-        因此复制关键文件到 PROFILE_DIR 后再启动新实例。
+
+        Args:
+            force: 是否强制同步（覆盖已有数据）
+
+        注意：只在首次或强制时同步，避免覆盖已有登录状态。
         """
+        # 如果已初始化且非强制，跳过同步
+        if self._is_profile_initialized() and not force:
+            print(f"[抖音下载] Profile 已存在，跳过同步（保留已有登录态）")
+            return
+
         native_dir = self._get_native_user_data_dir()
         if not native_dir:
+            print(f"[抖音下载] 未找到系统浏览器 Profile，将使用空白配置")
             return
 
         target = self.PROFILE_DIR
+        print(f"[抖音下载] 首次同步，从 {native_dir} 复制登录态...")
 
         # 单个文件：cookie 加密密钥 + cookie 数据库 + 配置
         files = [
@@ -158,42 +380,62 @@ class DouyinDownloader(IDownloader):
         except ImportError:
             raise DownloaderError(url=url, message="请安装 playwright: pip install playwright")
 
-        # 将系统浏览器的登录态同步到独立 profile，避免文件锁冲突
+        # 将系统浏览器的登录态同步到独立 profile（仅首次）
         self._sync_native_profile()
 
         video_data = {}
         chrome_path = self._get_chrome_path()
+        print(f"[抖音下载] 使用浏览器: {chrome_path or 'Playwright 内置'}")
 
         async with async_playwright() as p:
             launch_options = {
                 "user_data_dir": str(self.PROFILE_DIR),
                 "headless": False,  # 使用可见浏览器，不易被检测
                 "args": [
-                    "--disable-blink-features=AutomationControlled",
                     "--disable-infobars",
                     "--no-first-run",
                     "--no-default-browser-check",
                     "--disable-extensions",
                 ],
                 "viewport": {"width": 1280, "height": 800},
-                "ignore_default_args": ["--enable-automation"],
+                "ignore_default_args": ["--enable-automation", "--no-sandbox"],
             }
 
             # 如果找到本地 Chrome，使用它
             if chrome_path:
                 launch_options["executable_path"] = chrome_path
 
+            print(f"[抖音下载] 正在启动浏览器...")
             context = await p.chromium.launch_persistent_context(**launch_options)
+            print(f"[抖音下载] 浏览器已启动")
 
             try:
                 page = context.pages[0] if context.pages else await context.new_page()
 
                 # 注入反检测脚本
                 await page.add_init_script("""
+                    // 隐藏 webdriver 标识
                     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-                    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+                    delete navigator.__proto__.webdriver;
+
+                    // 伪造插件
+                    Object.defineProperty(navigator, 'plugins', {
+                        get: () => [
+                            { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
+                            { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
+                            { name: 'Native Client', filename: 'internal-nacl-plugin' }
+                        ]
+                    });
+
+                    // 语言设置
                     Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en'] });
-                    window.chrome = { runtime: {} };
+
+                    // Chrome 对象
+                    window.chrome = { runtime: {}, loadTimes: () => {}, csi: () => {} };
+
+                    // 隐藏自动化特征
+                    Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 1 });
+                    Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
                 """)
 
                 # 监听网络请求，捕获视频信息 API
@@ -218,20 +460,32 @@ class DouyinDownloader(IDownloader):
                 page.on("response", handle_response)
 
                 # 访问视频页面
+                print(f"[抖音下载] 正在访问页面: {url}")
                 await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+                print(f"[抖音下载] 页面已加载，等待视频信息...")
+
+                # 循环检测验证码/登录（可能反复出现）
+                auth_ok = await self._wait_and_retry_auth(page, max_retries=10)
+                if not auth_ok:
+                    await self._save_debug_info(page, "video_auth_timeout")
+                    raise DownloaderError(url=url, message="验证码/登录超时未完成")
 
                 # 等待视频信息被捕获
                 try:
                     await asyncio.wait_for(video_info_captured.wait(), timeout=20)
+                    print(f"[抖音下载] 已捕获视频信息")
                 except asyncio.TimeoutError:
-                    pass
+                    print(f"[抖音下载] 等待超时，尝试从页面提取...")
 
                 # 如果没捕获到，尝试从页面提取
                 if not video_data:
-                    await page.wait_for_timeout(3000)
+                    await page.wait_for_timeout(self._random_delay(self.PAGE_LOAD_DELAY))
                     video_data = await self._extract_from_page(page)
+                    if video_data:
+                        print(f"[抖音下载] 从页面提取到视频信息")
 
             finally:
+                print(f"[抖音下载] 关闭浏览器...")
                 await context.close()
 
         if not video_data:
@@ -349,6 +603,11 @@ class DouyinDownloader(IDownloader):
 
     async def get_video_info(self, url: str) -> VideoInfo:
         """获取视频信息"""
+        # 验证链接格式
+        is_valid, error_msg = self.validate_url(url)
+        if not is_valid:
+            raise DownloaderError(url=url, message=error_msg)
+
         video_data = await self._get_video_data_playwright(url)
         return self._parse_video_info(video_data, url)
 
@@ -360,6 +619,11 @@ class DouyinDownloader(IDownloader):
         progress_callback: Optional[IProgressCallback] = None,
     ) -> DownloadResult:
         """下载视频"""
+        # 验证链接格式
+        is_valid, error_msg = self.validate_url(url)
+        if not is_valid:
+            raise DownloaderError(url=url, message=error_msg)
+
         self._progress_callback = progress_callback
         self._current_progress = DownloadProgress()
         start_time = time.time()
@@ -479,73 +743,163 @@ class DouyinDownloader(IDownloader):
                 "user_data_dir": str(self.PROFILE_DIR),
                 "headless": False,
                 "args": [
-                    "--disable-blink-features=AutomationControlled",
                     "--disable-infobars",
                     "--no-first-run",
                     "--no-default-browser-check",
                     "--disable-extensions",
                 ],
                 "viewport": {"width": 1280, "height": 800},
-                "ignore_default_args": ["--enable-automation"],
+                "ignore_default_args": ["--enable-automation", "--no-sandbox"],
             }
 
             if chrome_path:
                 launch_options["executable_path"] = chrome_path
 
+            print(f"[抖音下载] 正在启动浏览器...")
             context = await p.chromium.launch_persistent_context(**launch_options)
+            print(f"[抖音下载] 浏览器已启动")
 
             try:
                 page = context.pages[0] if context.pages else await context.new_page()
 
                 # 注入反检测脚本
                 await page.add_init_script("""
+                    // 隐藏 webdriver 标识
                     Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-                    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+                    delete navigator.__proto__.webdriver;
+
+                    // 伪造插件
+                    Object.defineProperty(navigator, 'plugins', {
+                        get: () => [
+                            { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
+                            { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
+                            { name: 'Native Client', filename: 'internal-nacl-plugin' }
+                        ]
+                    });
+
+                    // 语言设置
                     Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en'] });
-                    window.chrome = { runtime: {} };
+
+                    // Chrome 对象
+                    window.chrome = { runtime: {}, loadTimes: () => {}, csi: () => {} };
+
+                    // 隐藏自动化特征
+                    Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 1 });
+                    Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
                 """)
 
                 # 访问用户主页
                 await page.goto(user_url, wait_until="domcontentloaded", timeout=60000)
-                await page.wait_for_timeout(3000)
+                await page.wait_for_timeout(self._random_delay(self.PAGE_LOAD_DELAY))
 
                 if interactive:
-                    # 等待用户手动完成验证
+                    # 交互模式：等待用户手动完成验证
                     loop = asyncio.get_event_loop()
                     await loop.run_in_executor(
                         None,
                         lambda: input("\n>>> 浏览器已打开，如需完成验证请在浏览器中操作，完成后回到此处按 回车键 继续...\n")
                     )
-                    await page.wait_for_timeout(2000)
+                    await page.wait_for_timeout(self._random_delay(self.PAGE_LOAD_DELAY))
                 else:
-                    # API模式：等待页面稳定后，用 wait_for_selector 等视频列表出现
-                    # （Playwright 的 wait_for_selector 能跨导航自动重试）
+                    # API模式：循环检测验证码/登录，直到页面正常加载
+                    # 等待页面稳定
                     try:
-                        await page.wait_for_load_state("networkidle", timeout=30000)
+                        await page.wait_for_load_state("networkidle", timeout=15000)
                     except Exception:
                         pass
-                    try:
-                        await page.wait_for_selector(
-                            'div[class*="userNewUi"]',
-                            timeout=120000,
-                        )
-                    except Exception:
-                        pass
-                    # 额外等待确保内容渲染完成
-                    await page.wait_for_timeout(3000)
 
-                # 提取链接的JS脚本（排除 user-page-footer 推荐区）
+                    # 循环检测验证码/登录（可能反复出现）
+                    auth_ok = await self._wait_and_retry_auth(page, max_retries=10)
+                    if not auth_ok:
+                        await self._save_debug_info(page, "auth_timeout")
+                        raise DownloaderError(url=user_url, message="验证码/登录超时未完成")
+
+                    # 等待页面完全加载（最多重试5次）
+                    video_links_found = False
+                    for load_attempt in range(5):
+                        print(f"[抖音下载] 等待页面加载... (第{load_attempt+1}次)")
+
+                        # 等待网络空闲
+                        try:
+                            await page.wait_for_load_state("networkidle", timeout=30000)
+                        except Exception:
+                            pass
+
+                        # 检测是否有验证码/登录
+                        has_block, block_type = await self._check_captcha(page)
+                        if has_block:
+                            print(f"[抖音下载] ⚠️ 检测到 {block_type}！请在浏览器中完成...")
+                            resolved = await self._wait_for_auth_resolved(page, 120)
+                            if not resolved:
+                                await self._save_debug_info(page, "auth_timeout_2")
+                                raise DownloaderError(url=user_url, message="验证码/登录超时未完成")
+                            # 等待页面刷新
+                            wait_time = random.uniform(10, 12)
+                            print(f"[抖音下载] 等待页面刷新 ({wait_time:.1f}s)...")
+                            await page.wait_for_timeout(int(wait_time * 1000))
+                            continue
+
+                        # 等待实际视频链接出现（不只是容器）
+                        try:
+                            await page.wait_for_selector('a[href*="/video/"]', timeout=15000)
+                            print(f"[抖音下载] ✓ 视频链接已加载")
+                            video_links_found = True
+                            break
+                        except Exception:
+                            # 检查是否有加载指示器
+                            loading = await page.query_selector('div[class*="loading"]')
+                            if loading:
+                                print(f"[抖音下载] 页面正在加载中，继续等待...")
+                                await page.wait_for_timeout(5000)
+                            else:
+                                print(f"[抖音下载] 未找到视频链接，等待页面继续加载...")
+                                await page.wait_for_timeout(5000)
+
+                    if not video_links_found:
+                        # 最后一次尝试 - 刷新页面
+                        print(f"[抖音下载] 多次尝试后仍未找到视频链接，刷新页面重试...")
+                        await page.reload(wait_until="networkidle", timeout=60000)
+                        await page.wait_for_timeout(8000)  # 刷新后多等一会儿
+                        try:
+                            await page.wait_for_selector('a[href*="/video/"]', timeout=30000)
+                            print(f"[抖音下载] ✓ 刷新后找到视频链接")
+                            video_links_found = True
+                        except Exception:
+                            await self._save_debug_info(page, "no_videos_after_refresh")
+                            raise DownloaderError(url=user_url, message="无法加载视频列表，请检查网络或重新登录")
+
+                    # 额外等待确保内容渲染完成
+                    await page.wait_for_timeout(self._random_delay(self.PAGE_LOAD_DELAY))
+
+                # 提取链接的JS脚本（支持多种容器选择器）
                 extract_js = '''() => {
-                    const containers = document.querySelectorAll('div[class*="userNewUi"]');
                     const links = new Set();
-                    containers.forEach(container => {
-                        const aTags = container.querySelectorAll('a[href]');
-                        aTags.forEach(a => {
-                            if (a.closest('.user-page-footer')) return;
-                            const href = a.getAttribute('href');
-                            if (href) links.add(href);
+
+                    // 尝试多种容器选择器
+                    const selectors = [
+                        'div[class*="userNewUi"]',
+                        'div[class*="user-post"]',
+                        'div[class*="video-list"]',
+                        'ul[class*="video"]',
+                        'main'
+                    ];
+
+                    for (const selector of selectors) {
+                        const containers = document.querySelectorAll(selector);
+                        containers.forEach(container => {
+                            const aTags = container.querySelectorAll('a[href]');
+                            aTags.forEach(a => {
+                                // 排除底部推荐区
+                                if (a.closest('.user-page-footer')) return;
+                                if (a.closest('[class*="recommend"]')) return;
+                                const href = a.getAttribute('href');
+                                if (href && href.includes('/video/')) {
+                                    links.add(href);
+                                }
+                            });
                         });
-                    });
+                    }
+
                     return Array.from(links);
                 }'''
 
@@ -554,13 +908,14 @@ class DouyinDownloader(IDownloader):
                     try:
                         return await page.evaluate(js)
                     except Exception:
-                        await page.wait_for_timeout(1000)
+                        await page.wait_for_timeout(self._random_delay((0.8, 1.5)))
                         try:
                             return await page.evaluate(js)
                         except Exception:
                             return default if default is not None else []
 
                 # 滚动加载所有视频
+                print(f"[抖音下载] 开始滚动加载视频列表...")
                 prev_count = 0
                 no_change_rounds = 0
 
@@ -568,9 +923,13 @@ class DouyinDownloader(IDownloader):
                     hrefs = await safe_evaluate(extract_js)
 
                     current_count = len(hrefs)
+                    if current_count > 0:
+                        print(f"[抖音下载] 滚动 {i+1}: 已发现 {current_count} 个视频链接")
+
                     if current_count == prev_count:
                         no_change_rounds += 1
                         if no_change_rounds >= 3:
+                            print(f"[抖音下载] 连续3次无新内容，停止滚动")
                             break
                     else:
                         no_change_rounds = 0
@@ -578,10 +937,34 @@ class DouyinDownloader(IDownloader):
 
                     # 向下滚动
                     await safe_evaluate('window.scrollTo(0, document.body.scrollHeight)')
-                    await page.wait_for_timeout(2000)
+                    await page.wait_for_timeout(self._random_delay(self.SCROLL_DELAY))
 
                 # 最终提取一次
                 hrefs = await safe_evaluate(extract_js)
+                print(f"[抖音下载] 最终提取到 {len(hrefs)} 个链接")
+
+                # 如果没有找到任何视频，保存调试信息
+                if len(hrefs) == 0:
+                    print(f"[抖音下载] ⚠️ 未找到视频链接")
+                    await self._save_debug_info(page, "no_videos")
+
+                    # 调试：打印页面上所有链接
+                    all_links = await page.evaluate('''() => {
+                        const links = [];
+                        document.querySelectorAll('a[href]').forEach(a => {
+                            const href = a.getAttribute('href');
+                            if (href && !href.startsWith('javascript:')) {
+                                links.push(href.substring(0, 80));
+                            }
+                        });
+                        return links.slice(0, 20);  // 只取前20个
+                    }''')
+                    print(f"[抖音下载] 页面链接示例 (共{len(all_links)}个): {all_links[:5]}")
+
+                    # 检查是否还有验证码/登录
+                    has_block, block_type = await self._check_captcha(page)
+                    if has_block:
+                        print(f"[抖音下载] ⚠️ 页面仍有 {block_type}，请手动完成验证")
 
                 # 将相对路径转换为完整URL，只保留视频链接
                 for href in hrefs:
@@ -591,10 +974,264 @@ class DouyinDownloader(IDownloader):
                     elif 'douyin.com/video/' in href:
                         video_urls.append(href)
 
+                print(f"[抖音下载] 共提取 {len(video_urls)} 个有效视频链接")
+
+                # 保存视频URL列表到调试日志
+                if video_urls:
+                    self._save_video_urls_log(user_url, video_urls)
+
             finally:
                 await context.close()
 
         return video_urls
+
+    async def extract_user_videos_with_download_urls(
+        self,
+        user_url: str,
+        max_scroll: int = 50,
+        on_progress: Optional[callable] = None,
+    ) -> list[dict]:
+        """
+        从抖音用户主页提取所有视频的下载地址（一次性，只开一次浏览器）
+
+        Args:
+            user_url: 抖音用户主页URL
+            max_scroll: 最大滚动次数
+            on_progress: 进度回调 (current, total, video_info)
+
+        Returns:
+            视频信息列表，每个元素包含:
+            {
+                "url": 视频页面URL,
+                "title": 标题,
+                "author": 作者,
+                "download_url": 真实下载地址,
+                "thumbnail": 封面图,
+            }
+        """
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError:
+            raise DownloaderError(url=user_url, message="请安装 playwright: pip install playwright")
+
+        self._sync_native_profile()
+        chrome_path = self._get_chrome_path()
+        results: list[dict] = []
+
+        async with async_playwright() as p:
+            launch_options = {
+                "user_data_dir": str(self.PROFILE_DIR),
+                "headless": False,
+                "args": [
+                    "--disable-infobars",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                    "--disable-extensions",
+                ],
+                "viewport": {"width": 1280, "height": 800},
+                "ignore_default_args": ["--enable-automation", "--no-sandbox"],
+            }
+
+            if chrome_path:
+                launch_options["executable_path"] = chrome_path
+
+            print(f"[抖音下载] 正在启动浏览器...")
+            context = await p.chromium.launch_persistent_context(**launch_options)
+            print(f"[抖音下载] 浏览器已启动")
+
+            try:
+                page = context.pages[0] if context.pages else await context.new_page()
+
+                # 注入反检测脚本
+                await page.add_init_script("""
+                    // 隐藏 webdriver 标识
+                    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                    delete navigator.__proto__.webdriver;
+
+                    // 伪造插件
+                    Object.defineProperty(navigator, 'plugins', {
+                        get: () => [
+                            { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
+                            { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
+                            { name: 'Native Client', filename: 'internal-nacl-plugin' }
+                        ]
+                    });
+
+                    // 语言设置
+                    Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en'] });
+
+                    // Chrome 对象
+                    window.chrome = { runtime: {}, loadTimes: () => {}, csi: () => {} };
+
+                    // 隐藏自动化特征
+                    Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 1 });
+                    Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
+                """)
+
+                # ========== 第一步：获取所有视频页面链接 ==========
+                print(f"[抖音下载] 正在访问用户主页: {user_url}")
+                await page.goto(user_url, wait_until="domcontentloaded", timeout=60000)
+                await page.wait_for_timeout(self._random_delay(self.PAGE_LOAD_DELAY))
+
+                # 等待页面加载
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=30000)
+                except Exception:
+                    pass
+                try:
+                    await page.wait_for_selector('div[class*="userNewUi"]', timeout=60000)
+                except Exception:
+                    pass
+                await page.wait_for_timeout(self._random_delay(self.PAGE_LOAD_DELAY))
+
+                # 提取链接的JS脚本
+                extract_js = '''() => {
+                    const containers = document.querySelectorAll('div[class*="userNewUi"]');
+                    const links = new Set();
+                    containers.forEach(container => {
+                        const aTags = container.querySelectorAll('a[href]');
+                        aTags.forEach(a => {
+                            if (a.closest('.user-page-footer')) return;
+                            const href = a.getAttribute('href');
+                            if (href && href.includes('/video/')) links.add(href);
+                        });
+                    });
+                    return Array.from(links);
+                }'''
+
+                # 滚动加载所有视频
+                print(f"[抖音下载] 正在滚动加载视频列表...")
+                prev_count = 0
+                no_change_rounds = 0
+
+                for i in range(max_scroll):
+                    try:
+                        hrefs = await page.evaluate(extract_js)
+                    except Exception:
+                        await page.wait_for_timeout(self._random_delay((0.8, 1.5)))
+                        continue
+
+                    current_count = len(hrefs)
+                    print(f"[抖音下载] 已发现 {current_count} 个视频...")
+
+                    if current_count == prev_count:
+                        no_change_rounds += 1
+                        if no_change_rounds >= 3:
+                            break
+                    else:
+                        no_change_rounds = 0
+                    prev_count = current_count
+
+                    await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                    await page.wait_for_timeout(self._random_delay(self.SCROLL_DELAY))
+
+                # 最终提取
+                hrefs = await page.evaluate(extract_js)
+                video_urls = []
+                for href in hrefs:
+                    if href.startswith('/video/'):
+                        video_urls.append(f"https://www.douyin.com{href}")
+                    elif 'douyin.com/video/' in href:
+                        video_urls.append(href)
+
+                total = len(video_urls)
+                print(f"[抖音下载] 共找到 {total} 个视频，开始获取下载地址...")
+
+                # 保存视频URL列表到调试日志
+                if video_urls:
+                    self._save_video_urls_log(user_url, video_urls)
+
+                # ========== 第二步：逐个获取下载地址 ==========
+                for idx, video_url in enumerate(video_urls, 1):
+                    video_info = {
+                        "url": video_url,
+                        "title": f"视频 {idx}",
+                        "author": None,
+                        "download_url": None,
+                        "thumbnail": None,
+                        "error": None,
+                    }
+
+                    try:
+                        # 设置网络监听捕获视频信息
+                        video_data = {}
+                        video_captured = asyncio.Event()
+
+                        async def handle_response(response):
+                            nonlocal video_data
+                            try:
+                                if "aweme/v1/web/aweme/detail" in response.url or "/aweme/detail" in response.url:
+                                    if response.status == 200:
+                                        data = await response.json()
+                                        if data.get("aweme_detail"):
+                                            video_data = data["aweme_detail"]
+                                            video_captured.set()
+                            except Exception:
+                                pass
+
+                        page.on("response", handle_response)
+
+                        # 访问视频页面
+                        print(f"[抖音下载] [{idx}/{total}] 获取下载地址...")
+                        await page.goto(video_url, wait_until="domcontentloaded", timeout=30000)
+
+                        # 等待捕获
+                        try:
+                            await asyncio.wait_for(video_captured.wait(), timeout=10)
+                        except asyncio.TimeoutError:
+                            pass
+
+                        # 移除监听器
+                        page.remove_listener("response", handle_response)
+
+                        if video_data:
+                            # 提取信息
+                            video_info["title"] = video_data.get("desc", f"视频 {idx}") or f"视频 {idx}"
+                            video_info["author"] = video_data.get("author", {}).get("nickname")
+                            video_info["thumbnail"] = video_data.get("video", {}).get("cover", {}).get("url_list", [None])[0]
+
+                            # 提取下载地址
+                            video = video_data.get("video", {})
+                            download_url = None
+
+                            # 方法1: play_addr
+                            play_addr = video.get("play_addr", {})
+                            url_list = play_addr.get("url_list", [])
+                            if url_list:
+                                download_url = url_list[0].replace("playwm", "play")
+
+                            # 方法2: bit_rate
+                            if not download_url:
+                                bit_rate = video.get("bit_rate", [])
+                                if bit_rate:
+                                    sorted_rates = sorted(bit_rate, key=lambda x: x.get("bit_rate", 0), reverse=True)
+                                    play_addr = sorted_rates[0].get("play_addr", {})
+                                    url_list = play_addr.get("url_list", [])
+                                    if url_list:
+                                        download_url = url_list[0]
+
+                            video_info["download_url"] = download_url
+                        else:
+                            video_info["error"] = "无法获取视频信息"
+
+                    except Exception as e:
+                        video_info["error"] = str(e)
+
+                    results.append(video_info)
+
+                    # 进度回调
+                    if on_progress:
+                        on_progress(idx, total, video_info)
+
+                    # 随机延迟避免请求过快
+                    await page.wait_for_timeout(self._random_delay(self.VIDEO_INTERVAL))
+
+            finally:
+                print(f"[抖音下载] 关闭浏览器...")
+                await context.close()
+
+        print(f"[抖音下载] 完成！成功获取 {sum(1 for r in results if r.get('download_url'))} 个下载地址")
+        return results
 
     async def download_audio_only(
         self,

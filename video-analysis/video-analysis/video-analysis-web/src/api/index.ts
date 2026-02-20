@@ -7,7 +7,7 @@ import type { Platform, VideoInfo, DownloadResponse, DownloadRequest, StreamEven
 
 const api = axios.create({
   baseURL: '/api',
-  timeout: 300000, // 5分钟超时（视频下载可能较慢）
+  timeout: 1800000, // 30分钟超时（批量下载视频需要更长时间）
 })
 
 /**

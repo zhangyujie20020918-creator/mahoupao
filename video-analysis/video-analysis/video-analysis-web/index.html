@@ -379,7 +379,7 @@
               platform: vm.selectedPlatform,
               quality: vm.quality,
               audio_only: false,
-            }, { timeout: 300000 })
+            }, { timeout: 7200000 })  // 2小时超时
               .then(function (resp) {
                 vm.result = resp.data;
                 vm.status = resp.data.success ? 'success' : 'error';
