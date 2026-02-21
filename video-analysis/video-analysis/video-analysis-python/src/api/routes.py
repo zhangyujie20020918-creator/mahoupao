@@ -157,34 +157,40 @@ async def download_video(request: DownloadRequest):
             import time
             start_time = time.time()
 
-            results = await service.download_user_videos(
+            # 使用流式下载以获取完整的统计信息
+            summary_data = None
+            failed_videos = []
+
+            async for event in service.download_user_videos_stream(
                 user_url=request.url,
                 output_dir=output_dir,
                 quality=request.quality.value,
-            )
+            ):
+                if event.get("type") == "done":
+                    summary_data = event
+                elif event.get("type") == "error":
+                    raise DownloaderError(url=request.url, message=event.get("message", "下载失败"))
 
-            items = []
-            for r in results:
-                items.append(BatchDownloadItemResponse(
-                    title=r.video_info.title if r.video_info else "未知",
-                    success=r.success,
-                    file_path=str(r.file_path) if r.file_path else None,
-                    file_size_human=r.file_size_human,
-                    error=r.error_message if not r.success else None,
-                ))
+            if not summary_data:
+                raise DownloaderError(url=request.url, message="下载过程异常终止")
 
-            succeeded = sum(1 for r in results if r.success)
-            failed = len(results) - succeeded
-
-            return BatchDownloadResponse(
-                success=succeeded > 0,
-                message=f"批量下载完成：成功 {succeeded} 个，失败 {failed} 个",
-                total=len(results),
-                succeeded=succeeded,
-                failed=failed,
-                results=items,
-                elapsed_time=time.time() - start_time,
-            )
+            # 构建包含完整统计的响应
+            return {
+                "success": True,
+                "message": f"下载完成：新下载 {summary_data.get('succeeded', 0)} 个，跳过 {summary_data.get('skipped', 0)} 个，失败 {summary_data.get('failed', 0)} 个",
+                "summary": {
+                    "username": summary_data.get("username", ""),
+                    "video_count": summary_data.get("total", 0),
+                    "work_count": summary_data.get("work_count", 0),
+                    "non_video_count": summary_data.get("non_video_count", 0),
+                    "succeeded": summary_data.get("succeeded", 0),
+                    "skipped": summary_data.get("skipped", 0),
+                    "failed": summary_data.get("failed", 0),
+                    "failed_videos": summary_data.get("skipped_videos", []),  # 这里是失败列表
+                    "elapsed_time": summary_data.get("elapsed_time", 0),
+                    "folder_path": summary_data.get("folder_path", ""),
+                },
+            }
 
         result = await service.download(
             url=request.url,

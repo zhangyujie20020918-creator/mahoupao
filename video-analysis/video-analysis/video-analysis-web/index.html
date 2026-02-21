@@ -202,6 +202,101 @@
         background: var(--primary-color);
         border-color: var(--primary-color);
       }
+
+      /* 下载报告样式 */
+      .report-section {
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .report-section:last-child {
+        margin-bottom: 0;
+        padding-bottom: 0;
+        border-bottom: none;
+      }
+
+      .report-header {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        margin-bottom: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .report-stats {
+        display: flex;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+      }
+
+      .stat-item {
+        text-align: center;
+        min-width: 80px;
+      }
+
+      .stat-value {
+        display: block;
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--text-color);
+        line-height: 1.2;
+      }
+
+      .stat-label {
+        display: block;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+      }
+
+      .stat-success .stat-value {
+        color: var(--success-color);
+      }
+
+      .stat-skipped .stat-value {
+        color: #f59e0b;
+      }
+
+      .stat-failed .stat-value {
+        color: var(--error-color);
+      }
+
+      .failed-list {
+        background: rgba(239, 68, 68, 0.1);
+        border-radius: 8px;
+        padding: 0.75rem;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+
+      .failed-item {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        font-size: 0.875rem;
+      }
+
+      .failed-item:last-child {
+        border-bottom: none;
+      }
+
+      .failed-index {
+        color: var(--text-muted);
+        min-width: 24px;
+      }
+
+      .failed-title {
+        flex: 1;
+        color: var(--text-color);
+      }
+
+      .failed-error {
+        color: var(--error-color);
+        font-size: 0.75rem;
+      }
     </style>
   </head>
   <body>
@@ -262,15 +357,87 @@
           </form>
         </div>
 
-        <!-- 结果展示 -->
-        <div v-if="result" class="card result-card" :class="result.success ? 'result-success' : 'result-error'">
+        <!-- 结果展示 - 用户主页批量下载报告 -->
+        <div v-if="result && result.success && result.summary" class="card result-card result-success">
           <h3 class="result-title">
-            <span v-if="result.success">&#10003;</span>
-            <span v-else>&#10007;</span>
-            {{ result.success ? '下载成功' : '下载失败' }}
+            <span>&#10003;</span>
+            下载完成
           </h3>
 
-          <div v-if="result.success && result.video_info" class="result-info">
+          <!-- 用户信息 -->
+          <div class="report-section">
+            <div class="report-header">用户信息</div>
+            <div class="report-stats">
+              <div class="stat-item">
+                <span class="stat-value">{{ result.summary.username || '未知' }}</span>
+                <span class="stat-label">用户名</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-value">{{ result.summary.video_count || 0 }}</span>
+                <span class="stat-label">视频总数</span>
+              </div>
+              <div class="stat-item" v-if="result.summary.non_video_count > 0">
+                <span class="stat-value">{{ result.summary.non_video_count }}</span>
+                <span class="stat-label">非视频作品</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 下载统计 -->
+          <div class="report-section">
+            <div class="report-header">下载统计</div>
+            <div class="report-stats">
+              <div class="stat-item stat-success">
+                <span class="stat-value">{{ result.summary.succeeded || 0 }}</span>
+                <span class="stat-label">新下载</span>
+              </div>
+              <div class="stat-item stat-skipped">
+                <span class="stat-value">{{ result.summary.skipped || 0 }}</span>
+                <span class="stat-label">已存在跳过</span>
+              </div>
+              <div class="stat-item" :class="{ 'stat-failed': result.summary.failed > 0 }">
+                <span class="stat-value">{{ result.summary.failed || 0 }}</span>
+                <span class="stat-label">失败</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 详细信息 -->
+          <div class="report-section">
+            <div class="report-header">详细信息</div>
+            <div class="result-info">
+              <div class="result-row">
+                <span class="result-label">耗时</span>
+                <span class="result-value">{{ result.summary.elapsed_time ? result.summary.elapsed_time.toFixed(1) + ' 秒' : '-' }}</span>
+              </div>
+              <div class="result-row">
+                <span class="result-label">保存目录</span>
+                <span class="result-value">{{ result.summary.folder_path || '-' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 失败列表 -->
+          <div v-if="result.summary.failed_videos && result.summary.failed_videos.length > 0" class="report-section">
+            <div class="report-header" style="color: var(--error-color);">失败的视频</div>
+            <div class="failed-list">
+              <div v-for="(item, index) in result.summary.failed_videos" :key="index" class="failed-item">
+                <span class="failed-index">{{ index + 1 }}.</span>
+                <span class="failed-title">{{ item.title || '未知标题' }}</span>
+                <span class="failed-error">{{ item.error || '下载失败' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 结果展示 - 单个视频下载 -->
+        <div v-if="result && result.success && !result.summary && result.video_info" class="card result-card result-success">
+          <h3 class="result-title">
+            <span>&#10003;</span>
+            下载成功
+          </h3>
+
+          <div class="result-info">
             <div class="result-row">
               <span class="result-label">标题</span>
               <span class="result-value">{{ result.video_info.title }}</span>
@@ -296,8 +463,15 @@
               <span class="result-value">{{ result.file_path }}</span>
             </div>
           </div>
+        </div>
 
-          <div v-if="!result.success" class="result-info">
+        <!-- 结果展示 - 下载失败 -->
+        <div v-if="result && !result.success" class="card result-card result-error">
+          <h3 class="result-title">
+            <span>&#10007;</span>
+            下载失败
+          </h3>
+          <div class="result-info">
             <p>{{ result.message }}</p>
           </div>
         </div>
