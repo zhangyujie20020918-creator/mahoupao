@@ -203,6 +203,24 @@
         border-color: var(--primary-color);
       }
 
+      /* 平台检测标签 */
+      .platform-badge {
+        display: inline-block;
+        margin-top: 0.5rem;
+        padding: 0.25rem 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        border-radius: 20px;
+        background: var(--primary-color);
+        color: white;
+      }
+
+      .platform-youtube { background: #ff0000; }
+      .platform-tiktok { background: #000000; border: 1px solid #333; }
+      .platform-douyin { background: #fe2c55; }
+      .platform-bilibili { background: #fb7299; }
+      .platform-rednote { background: #ff2442; }
+
       /* 下载报告样式 */
       .report-section {
         margin-bottom: 1.5rem;
@@ -309,17 +327,6 @@
 
         <div class="card">
           <form @submit.prevent="handleSubmit">
-            <!-- 平台选择 -->
-            <div class="form-group">
-              <label class="form-label">选择平台</label>
-              <select v-model="selectedPlatform" class="form-select">
-                <option value="" disabled>请选择平台</option>
-                <option v-for="p in platforms" :key="p.value" :value="p.value">
-                  {{ p.name }}
-                </option>
-              </select>
-            </div>
-
             <!-- URL输入 -->
             <div class="form-group">
               <label class="form-label">视频链接</label>
@@ -327,9 +334,14 @@
                 v-model="videoUrl"
                 type="text"
                 class="form-input"
-                placeholder="粘贴视频URL..."
+                :placeholder="status === 'loading' ? '下载中...' : '粘贴视频或用户主页URL...'"
                 :disabled="status === 'loading'"
+                @input="detectPlatform"
               />
+              <!-- 自动检测到的平台 -->
+              <div v-if="detectedPlatform" class="platform-badge" :class="'platform-' + detectedPlatform.value">
+                {{ detectedPlatform.name }}
+              </div>
             </div>
 
             <!-- 画质选择 -->
@@ -497,8 +509,14 @@
       var app = Vue.createApp({
         data: function () {
           return {
-            platforms: [],
-            selectedPlatform: '',
+            platforms: [
+              { name: 'YouTube', value: 'youtube', domains: ['youtube.com', 'youtu.be'] },
+              { name: 'TikTok', value: 'tiktok', domains: ['tiktok.com', 'vm.tiktok.com', 'vt.tiktok.com'] },
+              { name: '抖音', value: 'douyin', domains: ['douyin.com', 'v.douyin.com', 'iesdouyin.com'] },
+              { name: 'Bilibili', value: 'bilibili', domains: ['bilibili.com', 'b23.tv'] },
+              { name: '小红书', value: 'rednote', domains: ['xiaohongshu.com', 'xhslink.com'] },
+            ],
+            detectedPlatform: null,
             videoUrl: '',
             quality: 'best',
             status: 'idle',
@@ -513,20 +531,32 @@
           };
         },
         mounted: function () {
+          // 检查后端是否可用
           var vm = this;
           axios.get(API_BASE + '/platforms', { timeout: 10000 })
-            .then(function (resp) {
-              vm.platforms = resp.data.platforms;
-              if (vm.platforms.length > 0) {
-                vm.selectedPlatform = vm.platforms[0].value;
-              }
-            })
             .catch(function (e) {
-              console.error('加载平台列表失败:', e);
+              console.error('后端连接失败:', e);
               vm.errorMessage = '无法连接后端服务，请确认已启动 python run_server.py';
             });
         },
         methods: {
+          detectPlatform: function () {
+            var url = this.videoUrl.trim().toLowerCase();
+            this.detectedPlatform = null;
+            this.errorMessage = '';
+
+            if (!url) return;
+
+            for (var i = 0; i < this.platforms.length; i++) {
+              var platform = this.platforms[i];
+              for (var j = 0; j < platform.domains.length; j++) {
+                if (url.indexOf(platform.domains[j]) !== -1) {
+                  this.detectedPlatform = platform;
+                  return;
+                }
+              }
+            }
+          },
           formatDuration: function (seconds) {
             if (!seconds) return '-';
             var h = Math.floor(seconds / 3600);
@@ -543,6 +573,11 @@
               return;
             }
 
+            if (!this.detectedPlatform) {
+              this.errorMessage = '无法识别该链接的平台，请检查URL是否正确';
+              return;
+            }
+
             var vm = this;
             vm.status = 'loading';
             vm.result = null;
@@ -550,7 +585,7 @@
 
             axios.post(API_BASE + '/download', {
               url: vm.videoUrl.trim(),
-              platform: vm.selectedPlatform,
+              platform: vm.detectedPlatform.value,
               quality: vm.quality,
               audio_only: false,
             }, { timeout: 7200000 })  // 2小时超时
