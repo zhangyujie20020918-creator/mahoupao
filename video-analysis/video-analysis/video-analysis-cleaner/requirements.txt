@@ -1,0 +1,29 @@
+# Video Analysis Cleaner - Dependencies (GPU version by default)
+#
+# Install: pip install -r requirements.txt
+# For CPU version: python install.py
+
+--extra-index-url https://download.pytorch.org/whl/cu121
+
+# Web framework
+fastapi>=0.104.0
+uvicorn>=0.24.0
+
+# Audio processing
+pydub>=0.25.1
+
+# PyTorch (for GPU detection, cu121 = CUDA 12.1)
+torch>=2.0.0+cu121
+
+# ASR speech recognition (GPU accelerated)
+faster-whisper>=0.10.0
+
+# CUDA support (required for GPU mode)
+nvidia-cublas-cu12
+nvidia-cudnn-cu12
+
+# Hugging Face model download
+huggingface-hub>=0.20.0
+
+# Utils
+python-multipart>=0.0.6

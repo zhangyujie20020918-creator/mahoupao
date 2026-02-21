@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>数据清洗 - Video Analysis</title>
+    <style>
+      :root {
+        --primary-color: #10b981;
+        --primary-hover: #059669;
+        --secondary-color: #8b5cf6;
+        --bg-color: #1a1a1a;
+        --card-bg: #242424;
+        --text-color: rgba(255, 255, 255, 0.87);
+        --text-muted: rgba(255, 255, 255, 0.6);
+        --border-color: rgba(255, 255, 255, 0.1);
+        --success-color: #10b981;
+        --warning-color: #f59e0b;
+        --error-color: #ef4444;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        min-height: 100vh;
+      }
+
+      #app { max-width: 1000px; margin: 0 auto; padding: 2rem; }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+      }
+
+      .title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--primary-color), #06b6d4);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .nav-link {
+        color: var(--text-muted);
+        text-decoration: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        transition: all 0.2s;
+      }
+
+      .nav-link:hover { background: var(--card-bg); color: var(--text-color); }
+
+      .card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border: 1px solid var(--border-color);
+      }
+
+      .card-title {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .folder-list { display: grid; gap: 0.75rem; }
+
+      .folder-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 2px solid transparent;
+      }
+
+      .folder-item:hover { border-color: var(--primary-color); }
+      .folder-item.selected { border-color: var(--primary-color); background: rgba(16, 185, 129, 0.1); }
+
+      .folder-name { font-weight: 600; font-size: 1.05rem; }
+
+      .folder-stats {
+        display: flex;
+        gap: 1rem;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+      }
+
+      .badge {
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+      }
+
+      .badge-video { background: #3b82f6; color: white; }
+      .badge-audio { background: #8b5cf6; color: white; }
+      .badge-text { background: #10b981; color: white; }
+
+      .tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .tab {
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        background: var(--bg-color);
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 0.95rem;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+
+      .tab:hover { color: var(--text-color); }
+      .tab.active { background: var(--primary-color); color: white; }
+      .tab.active.secondary { background: var(--secondary-color); }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        gap: 0.5rem;
+      }
+
+      .btn-primary { background: var(--primary-color); color: white; }
+      .btn-secondary { background: var(--secondary-color); color: white; }
+      .btn:hover:not(:disabled) { filter: brightness(1.1); }
+      .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+      .model-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+        margin-bottom: 1rem;
+      }
+
+      .model-info { display: flex; flex-direction: column; gap: 0.25rem; }
+      .model-name { font-weight: 600; }
+      .model-path { font-size: 0.8rem; color: var(--text-muted); word-break: break-all; }
+
+      .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 0.5rem;
+      }
+
+      .status-dot.online { background: var(--success-color); }
+      .status-dot.offline { background: var(--error-color); }
+      .status-dot.warning { background: var(--warning-color); }
+
+      .progress-section { margin-top: 1rem; }
+
+      .progress-bar-container {
+        height: 8px;
+        background: var(--bg-color);
+        border-radius: 4px;
+        overflow: hidden;
+        margin: 0.5rem 0;
+      }
+
+      .progress-bar {
+        height: 100%;
+        background: var(--primary-color);
+        transition: width 0.3s;
+      }
+
+      .progress-bar.secondary { background: var(--secondary-color); }
+
+      .progress-text { font-size: 0.875rem; color: var(--text-muted); }
+
+      .progress-log {
+        margin-top: 1rem;
+        max-height: 250px;
+        overflow-y: auto;
+        background: var(--bg-color);
+        border-radius: 8px;
+        padding: 1rem;
+        font-family: monospace;
+        font-size: 0.8rem;
+      }
+
+      .log-item { padding: 0.2rem 0; display: flex; gap: 0.5rem; }
+      .log-item.done { color: var(--success-color); }
+      .log-item.error { color: var(--error-color); }
+      .log-item.skipped { color: var(--warning-color); }
+
+      .result-summary {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+
+      .result-item {
+        text-align: center;
+        padding: 1rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+      }
+
+      .result-value { font-size: 1.75rem; font-weight: 700; }
+      .result-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid var(--border-color);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: var(--text-muted);
+      }
+
+      .section-divider {
+        height: 1px;
+        background: var(--border-color);
+        margin: 1.5rem 0;
+      }
+
+      .device-selector {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      .device-btn {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 1rem;
+        background: var(--bg-color);
+        border: 2px solid var(--border-color);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: var(--text-color);
+      }
+
+      .device-btn:hover:not(:disabled) {
+        border-color: var(--primary-color);
+      }
+
+      .device-btn.active {
+        border-color: var(--primary-color);
+        background: rgba(16, 185, 129, 0.1);
+      }
+
+      .device-btn.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .device-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .device-icon {
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+
+      .device-name {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .device-status {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        background: var(--border-color);
+        color: var(--text-muted);
+      }
+
+      .device-status.active {
+        background: var(--primary-color);
+        color: white;
+      }
+
+      .gpu-error {
+        padding: 0.75rem 1rem;
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid var(--error-color);
+        border-radius: 8px;
+        color: var(--error-color);
+        font-size: 0.85rem;
+        margin-bottom: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="header">
+        <h1 class="title">数据清洗</h1>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <span>
+            <span class="status-dot" :class="serviceOnline ? 'online' : 'offline'"></span>
+            {{ serviceOnline ? '服务在线' : '服务离线' }}
+          </span>
+          <a href="index.html" class="nav-link">返回下载</a>
+        </div>
+      </div>
+
+      <!-- 服务离线 -->
+      <div v-if="!serviceOnline" class="card">
+        <div class="empty-state">
+          <p style="font-size: 1.25rem; margin-bottom: 1rem;">清洗服务未启动</p>
+          <code style="display: block; padding: 1rem; background: var(--bg-color); border-radius: 8px; text-align: left;">
+            cd video-analysis-cleaner<br>
+            pip install -r requirements.txt<br>
+            python run_server.py
+          </code>
+        </div>
+      </div>
+
+      <template v-if="serviceOnline">
+        <!-- 设备配置 -->
+        <div class="card">
+          <div class="card-title">
+            <span class="status-dot" :class="gpuInfo.available ? 'online' : 'warning'"></span>
+            计算设备
+          </div>
+
+          <!-- GPU 状态 -->
+          <div class="device-selector">
+            <button
+              class="device-btn"
+              :class="{ active: currentDevice === 'cuda', disabled: !gpuInfo.available }"
+              :disabled="!gpuInfo.available || switchingDevice"
+              @click="switchDevice('cuda')"
+            >
+              <span class="device-icon">GPU</span>
+              <span class="device-name">{{ gpuInfo.name || 'CUDA' }}</span>
+              <span v-if="!gpuInfo.available" class="device-status">不可用</span>
+              <span v-else-if="currentDevice === 'cuda'" class="device-status active">使用中</span>
+            </button>
+            <button
+              class="device-btn"
+              :class="{ active: currentDevice === 'cpu' }"
+              :disabled="switchingDevice"
+              @click="switchDevice('cpu')"
+            >
+              <span class="device-icon">CPU</span>
+              <span class="device-name">处理器</span>
+              <span v-if="currentDevice === 'cpu'" class="device-status active">使用中</span>
+            </button>
+          </div>
+
+          <!-- GPU 错误提示 -->
+          <div v-if="gpuInfo.error && !gpuInfo.available" class="gpu-error">
+            {{ gpuInfo.error }}
+          </div>
+
+          <div class="section-divider"></div>
+
+          <!-- ASR 模型 -->
+          <div class="card-title" style="margin-top: 0.5rem;">
+            <span class="status-dot" :class="modelExists ? 'online' : 'warning'"></span>
+            ASR 模型
+          </div>
+          <div class="model-card">
+            <div class="model-info">
+              <div class="model-name">{{ modelInfo.name || 'medium' }}</div>
+              <div class="model-path">路径: {{ modelInfo.path }}</div>
+              <div v-if="modelExists" class="model-path">大小: {{ modelInfo.size_mb }} MB</div>
+            </div>
+            <button
+              v-if="!modelExists"
+              class="btn btn-secondary"
+              :disabled="downloadingModel"
+              @click="downloadModel"
+            >
+              <span v-if="downloadingModel" class="spinner"></span>
+              {{ downloadingModel ? '下载中...' : '下载模型' }}
+            </button>
+            <span v-else style="color: var(--success-color);">已就绪</span>
+          </div>
+
+          <!-- 模型下载进度 -->
+          <div v-if="downloadingModel" class="progress-section">
+            <div class="progress-bar-container">
+              <div class="progress-bar secondary" :style="{ width: modelDownloadPercent + '%' }"></div>
+            </div>
+            <div class="progress-text">{{ modelDownloadMessage }}</div>
+          </div>
+        </div>
+
+        <!-- 文件夹选择 -->
+        <div class="card">
+          <div class="card-title">选择文件夹</div>
+          <div v-if="folders.length === 0" class="empty-state">
+            <p>没有找到文件夹，请先下载视频</p>
+          </div>
+          <div v-else class="folder-list">
+            <div
+              v-for="folder in folders"
+              :key="folder.name"
+              class="folder-item"
+              :class="{ selected: selectedFolder === folder.name }"
+              @click="selectFolder(folder.name)"
+            >
+              <div>
+                <div class="folder-name">{{ folder.name }}</div>
+                <div class="folder-stats">
+                  <span><span class="badge badge-video">{{ folder.video_count }}</span> 视频</span>
+                  <span><span class="badge badge-audio">{{ folder.audio_count }}</span> 音频</span>
+                  <span><span class="badge badge-text">{{ folder.text_count }}</span> 文本</span>
+                  <span>{{ folder.total_size_mb }} MB</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 功能选项卡 -->
+        <div v-if="selectedFolder" class="card">
+          <div class="tabs">
+            <button class="tab" :class="{ active: activeTab === 'convert' }" @click="activeTab = 'convert'">
+              MP4 转 MP3
+            </button>
+            <button
+              class="tab"
+              :class="{ active: activeTab === 'transcribe', secondary: activeTab === 'transcribe' }"
+              @click="activeTab = 'transcribe'"
+            >
+              语音转文字
+            </button>
+          </div>
+
+          <!-- MP4 转 MP3 -->
+          <div v-if="activeTab === 'convert'">
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+              将文件夹中的 MP4 视频提取音频为 MP3 格式
+            </p>
+            <button
+              class="btn btn-primary"
+              :disabled="converting"
+              @click="startConvert"
+            >
+              <span v-if="converting" class="spinner"></span>
+              {{ converting ? '转换中...' : '开始转换' }}
+            </button>
+
+            <div v-if="convertLogs.length > 0" class="progress-section">
+              <div class="progress-bar-container">
+                <div class="progress-bar" :style="{ width: convertPercent + '%' }"></div>
+              </div>
+              <div class="progress-text">{{ convertMessage }}</div>
+              <div class="progress-log">
+                <div v-for="(log, i) in convertLogs" :key="i" class="log-item" :class="log.status">
+                  [{{ log.current }}/{{ log.total }}] {{ log.file }} - {{ log.message }}
+                </div>
+              </div>
+            </div>
+
+            <div v-if="convertResults" class="result-summary">
+              <div class="result-item">
+                <div class="result-value" style="color: var(--success-color);">{{ convertResults.converted }}</div>
+                <div class="result-label">已转换</div>
+              </div>
+              <div class="result-item">
+                <div class="result-value" style="color: var(--warning-color);">{{ convertResults.skipped }}</div>
+                <div class="result-label">已跳过</div>
+              </div>
+              <div class="result-item">
+                <div class="result-value" style="color: var(--error-color);">{{ convertResults.failed }}</div>
+                <div class="result-label">失败</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 语音转文字 -->
+          <div v-if="activeTab === 'transcribe'">
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+              使用 Whisper 模型将音频转写为文字（需要先下载模型）
+            </p>
+
+            <div v-if="!modelExists" style="color: var(--warning-color); margin-bottom: 1rem;">
+              请先下载 ASR 模型
+            </div>
+
+            <button
+              class="btn btn-secondary"
+              :disabled="transcribing || !modelExists"
+              @click="startTranscribe"
+            >
+              <span v-if="transcribing" class="spinner"></span>
+              {{ transcribing ? '转写中...' : '开始转写' }}
+            </button>
+
+            <div v-if="transcribeLogs.length > 0" class="progress-section">
+              <div class="progress-bar-container">
+                <div class="progress-bar secondary" :style="{ width: transcribePercent + '%' }"></div>
+              </div>
+              <div class="progress-text">{{ transcribeMessage }}</div>
+              <div class="progress-log">
+                <div v-for="(log, i) in transcribeLogs" :key="i" class="log-item" :class="log.status">
+                  [{{ log.current }}/{{ log.total }}] {{ log.file }} - {{ log.message }}
+                </div>
+              </div>
+            </div>
+
+            <div v-if="transcribeResults" class="result-summary">
+              <div class="result-item">
+                <div class="result-value" style="color: var(--success-color);">{{ transcribeResults.transcribed }}</div>
+                <div class="result-label">已转写</div>
+              </div>
+              <div class="result-item">
+                <div class="result-value" style="color: var(--warning-color);">{{ transcribeResults.skipped }}</div>
+                <div class="result-label">已跳过</div>
+              </div>
+              <div class="result-item">
+                <div class="result-value" style="color: var(--error-color);">{{ transcribeResults.failed }}</div>
+                <div class="result-label">失败</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script>
+      var API = 'http://localhost:8001/api/cleaner';
+
+      var app = Vue.createApp({
+        data: function() {
+          return {
+            serviceOnline: false,
+            modelExists: false,
+            modelInfo: {},
+            downloadingModel: false,
+            modelDownloadPercent: 0,
+            modelDownloadMessage: '',
+
+            gpuInfo: { available: false, name: null, error: null },
+            currentDevice: 'cpu',
+            switchingDevice: false,
+
+            folders: [],
+            selectedFolder: null,
+            activeTab: 'convert',
+
+            converting: false,
+            convertLogs: [],
+            convertMessage: '',
+            convertPercent: 0,
+            convertResults: null,
+
+            transcribing: false,
+            transcribeLogs: [],
+            transcribeMessage: '',
+            transcribePercent: 0,
+            transcribeResults: null,
+          };
+        },
+        mounted: function() {
+          this.checkService();
+        },
+        methods: {
+          checkService: function() {
+            var vm = this;
+            fetch(API + '/status')
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                vm.serviceOnline = true;
+                vm.modelExists = data.model.exists;
+                vm.modelInfo = data.model;
+                vm.gpuInfo = {
+                  available: data.gpu.available,
+                  name: data.gpu.name,
+                  error: data.gpu.error,
+                };
+                vm.currentDevice = data.device;
+                vm.loadFolders();
+              })
+              .catch(function() {
+                vm.serviceOnline = false;
+              });
+          },
+
+          loadFolders: function() {
+            var vm = this;
+            fetch(API + '/folders')
+              .then(function(r) { return r.json(); })
+              .then(function(data) { vm.folders = data.folders; });
+          },
+
+          selectFolder: function(name) {
+            this.selectedFolder = name;
+            this.convertLogs = [];
+            this.convertResults = null;
+            this.transcribeLogs = [];
+            this.transcribeResults = null;
+          },
+
+          switchDevice: function(device) {
+            var vm = this;
+            if (vm.switchingDevice) return;
+            if (device === vm.currentDevice) return;
+            if (device === 'cuda' && !vm.gpuInfo.available) return;
+
+            vm.switchingDevice = true;
+            fetch(API + '/device', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ device: device }),
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                vm.switchingDevice = false;
+                if (data.success) {
+                  vm.currentDevice = data.device;
+                }
+              })
+              .catch(function() {
+                vm.switchingDevice = false;
+              });
+          },
+
+          downloadModel: function() {
+            var vm = this;
+            vm.downloadingModel = true;
+            vm.modelDownloadPercent = 0;
+            vm.modelDownloadMessage = '准备下载...';
+
+            fetch(API + '/model/download', { method: 'POST' })
+              .then(function(response) {
+                var reader = response.body.getReader();
+                var decoder = new TextDecoder();
+
+                function read() {
+                  reader.read().then(function(result) {
+                    if (result.done) {
+                      vm.downloadingModel = false;
+                      vm.checkService();
+                      return;
+                    }
+
+                    var lines = decoder.decode(result.value).split('\n');
+                    lines.forEach(function(line) {
+                      if (line.startsWith('data: ')) {
+                        try {
+                          var data = JSON.parse(line.substring(6));
+                          if (data.percent !== undefined) {
+                            vm.modelDownloadPercent = data.percent;
+                          }
+                          if (data.message) {
+                            vm.modelDownloadMessage = data.message;
+                          }
+                          if (data.type === 'done') {
+                            vm.downloadingModel = false;
+                            vm.modelExists = true;
+                            vm.checkService();
+                          }
+                          if (data.type === 'error') {
+                            vm.downloadingModel = false;
+                            vm.modelDownloadMessage = '下载失败: ' + data.message;
+                          }
+                        } catch (e) {}
+                      }
+                    });
+                    read();
+                  });
+                }
+                read();
+              });
+          },
+
+          startConvert: function() {
+            var vm = this;
+            vm.converting = true;
+            vm.convertLogs = [];
+            vm.convertResults = null;
+            vm.convertMessage = '准备中...';
+            vm.convertPercent = 0;
+
+            fetch(API + '/convert', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ folder_name: vm.selectedFolder }),
+            }).then(function(response) {
+              var reader = response.body.getReader();
+              var decoder = new TextDecoder();
+
+              function read() {
+                reader.read().then(function(result) {
+                  if (result.done) {
+                    vm.converting = false;
+                    vm.loadFolders();
+                    return;
+                  }
+
+                  var lines = decoder.decode(result.value).split('\n');
+                  lines.forEach(function(line) {
+                    if (line.startsWith('data: ')) {
+                      try {
+                        var data = JSON.parse(line.substring(6));
+                        if (data.type === 'progress') {
+                          vm.convertPercent = Math.round((data.current / data.total) * 100);
+                          vm.convertMessage = data.file + ' - ' + data.message;
+                          vm.convertLogs.push(data);
+                        } else if (data.type === 'done') {
+                          vm.converting = false;
+                          vm.convertResults = data;
+                          vm.convertMessage = data.message;
+                        }
+                      } catch (e) {}
+                    }
+                  });
+                  read();
+                });
+              }
+              read();
+            });
+          },
+
+          startTranscribe: function() {
+            var vm = this;
+            vm.transcribing = true;
+            vm.transcribeLogs = [];
+            vm.transcribeResults = null;
+            vm.transcribeMessage = '准备中...';
+            vm.transcribePercent = 0;
+
+            fetch(API + '/transcribe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ folder_name: vm.selectedFolder }),
+            }).then(function(response) {
+              var reader = response.body.getReader();
+              var decoder = new TextDecoder();
+
+              function read() {
+                reader.read().then(function(result) {
+                  if (result.done) {
+                    vm.transcribing = false;
+                    vm.loadFolders();
+                    return;
+                  }
+
+                  var lines = decoder.decode(result.value).split('\n');
+                  lines.forEach(function(line) {
+                    if (line.startsWith('data: ')) {
+                      try {
+                        var data = JSON.parse(line.substring(6));
+                        if (data.type === 'progress') {
+                          if (data.total > 0) {
+                            vm.transcribePercent = Math.round((data.current / data.total) * 100);
+                          }
+                          vm.transcribeMessage = (data.file || '') + ' - ' + data.message;
+                          if (data.status && data.status !== 'loading' && data.status !== 'ready') {
+                            vm.transcribeLogs.push(data);
+                          }
+                        } else if (data.type === 'done') {
+                          vm.transcribing = false;
+                          vm.transcribeResults = data;
+                          vm.transcribeMessage = data.message;
+                        } else if (data.type === 'error') {
+                          vm.transcribing = false;
+                          vm.transcribeMessage = '错误: ' + data.message;
+                        }
+                      } catch (e) {}
+                    }
+                  });
+                  read();
+                });
+              }
+              read();
+            });
+          },
+        },
+      });
+
+      app.mount('#app');
+    </script>
+  </body>
+</html>
