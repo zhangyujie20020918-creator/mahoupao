@@ -49,6 +49,15 @@ class BrowserManager:
         if self._context and (self._profile_dir != profile_dir or self._chrome_path != chrome_path):
             await self.close()
 
+        # 检查浏览器是否仍然有效（用户可能手动关闭了）
+        if self._context is not None:
+            try:
+                # 尝试访问 pages 来检测连接是否有效
+                _ = self._context.pages
+            except Exception as e:
+                print(f"[浏览器管理器] 检测到浏览器已断开: {e}")
+                await self._cleanup()
+
         if self._context is None:
             await self._launch(profile_dir, chrome_path)
 
@@ -60,6 +69,18 @@ class BrowserManager:
                 self._page = await self._context.new_page()
 
         return self._page
+
+    async def _cleanup(self):
+        """清理失效的浏览器资源（不尝试关闭，因为已断开）"""
+        print(f"[浏览器管理器] 清理失效的浏览器资源...")
+        self._context = None
+        self._page = None
+        if self._playwright:
+            try:
+                await self._playwright.stop()
+            except Exception:
+                pass
+            self._playwright = None
 
     async def _launch(self, profile_dir: Path, chrome_path: Optional[str] = None):
         """启动浏览器"""
