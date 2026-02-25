@@ -1,0 +1,21 @@
+"""Chat Schema"""
+
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel
+
+
+class ChatRequest(BaseModel):
+    """对话请求"""
+
+    user_id: str
+    blogger: str
+    message: str
+    model: Optional[str] = None
+
+
+class ChatEvent(BaseModel):
+    """SSE 事件"""
+
+    event: str  # "thinking" | "searching" | "token" | "done" | "error"
+    data: Dict[str, Any] = {}

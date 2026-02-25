@@ -1,0 +1,94 @@
+# Video-Analysis-Soul 配置
+
+# Persona 配置
+persona:
+  maker_output_path: "${MAKER_OUTPUT_PATH:../video-analysis-maker/output}"
+  default_persona: null
+  knowledge_retrieval:
+    top_k: 10
+    rerank_top_k: 3
+    include_context: true
+    context_window: 2
+
+# 用户记忆配置
+memory:
+  preview:
+    retention: permanent
+    summary_trigger_messages: 10
+  detailed_history:
+    retention_days: 14
+    archive_enabled: true
+  long_term:
+    enabled: true
+    retention: permanent
+    max_facts: 200
+
+# 缓存配置
+cache:
+  idle_timeout_seconds: 600
+  max_sessions: 50
+  max_messages_per_session: 100
+  max_memory_mb: 512
+  cleanup_interval_seconds: 60
+
+# LLM 模型配置
+llm:
+  default_model: "gemini-2.5-flash"
+  analysis_model: "gemini-2.5-flash"
+  summary_model: "gemini-2.5-flash"
+  available_models:
+    - gemini-2.5-flash
+    - gemini-2.5-pro
+  timeout_seconds: 30
+  max_retries: 2
+
+# 分析配置
+analysis:
+  intent:
+    enabled: true
+    confidence_threshold: 0.7
+  emotion:
+    enabled: true
+    general_triggers:
+      - ["开心", "高兴", "兴奋", "激动"]
+      - ["难过", "伤心", "失落", "沮丧"]
+      - ["焦虑", "担心", "紧张", "害怕"]
+      - ["生气", "愤怒", "烦躁", "不满"]
+    response_style:
+      positive: "warm"
+      negative: "empathetic"
+      anxious: "reassuring"
+  info_extraction:
+    enabled: true
+    extract_types:
+      - "person_name"
+      - "location"
+      - "event"
+      - "preference"
+      - "relationship"
+
+# 流式响应配置
+streaming:
+  chunk_size: 10
+  heartbeat_interval_ms: 15000
+
+# UI 配置
+ui:
+  debug:
+    show_memory_usage: true
+    show_retrieval_details: true
+    show_intent_analysis: true
+
+# 日志配置
+logging:
+  level: INFO
+  file_path: logs/soul.log
+  backup_count: 30
+  module_levels:
+    llm_service: DEBUG
+    chroma_store: DEBUG
+    cache_manager: INFO
+  redact_fields:
+    - api_key
+    - password
+    - token

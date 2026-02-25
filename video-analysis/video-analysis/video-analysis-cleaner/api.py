@@ -92,6 +92,10 @@ async def get_status():
         "device": config.DEVICE,
         "compute_type": config.COMPUTE_TYPE,
         "downloads_dir": str(DOWNLOADS_DIR),
+        "paths": {
+            "downloads_dir": str(DOWNLOADS_DIR),
+            "models_dir": str(MODELS_DIR),
+        },
     }
 
 

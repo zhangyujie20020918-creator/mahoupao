@@ -1,0 +1,1678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>声音克隆 - Video Analysis</title>
+    <style>
+      :root {
+        --primary-color: #ec4899;
+        --primary-hover: #db2777;
+        --secondary-color: #8b5cf6;
+        --bg-color: #1a1a1a;
+        --card-bg: #242424;
+        --text-color: rgba(255, 255, 255, 0.87);
+        --text-muted: rgba(255, 255, 255, 0.6);
+        --border-color: rgba(255, 255, 255, 0.1);
+        --success-color: #10b981;
+        --warning-color: #f59e0b;
+        --error-color: #ef4444;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        min-height: 100vh;
+      }
+
+      #app { max-width: 1000px; margin: 0 auto; padding: 2rem; }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+      }
+
+      .title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--primary-color), #f472b6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+
+      .nav-link {
+        color: var(--text-muted);
+        text-decoration: none;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        transition: all 0.2s;
+      }
+
+      .nav-link:hover { background: var(--card-bg); color: var(--text-color); }
+
+      .card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border: 1px solid var(--border-color);
+      }
+
+      .card-title {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .blogger-list { display: grid; gap: 0.75rem; }
+
+      .blogger-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 2px solid transparent;
+      }
+
+      .blogger-item:hover { border-color: var(--primary-color); }
+      .blogger-item.selected { border-color: var(--primary-color); background: rgba(236, 72, 153, 0.1); }
+
+      .blogger-name { font-weight: 600; font-size: 1.05rem; }
+
+      .blogger-stats {
+        display: flex;
+        gap: 1rem;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+      }
+
+      .badge {
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+      }
+
+      .badge-source { background: #3b82f6; color: white; }
+      .badge-dataset { background: #8b5cf6; color: white; }
+      .badge-model { background: #ec4899; color: white; }
+      .badge-ready { background: #10b981; color: white; }
+
+      .tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .tab {
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        background: var(--bg-color);
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 0.95rem;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+
+      .tab:hover { color: var(--text-color); }
+      .tab.active { background: var(--primary-color); color: white; }
+      .tab.active.secondary { background: var(--secondary-color); }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.75rem 1.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        gap: 0.5rem;
+      }
+
+      .btn-primary { background: var(--primary-color); color: white; }
+      .btn-secondary { background: var(--secondary-color); color: white; }
+      .btn-success { background: var(--success-color); color: white; }
+      .btn:hover:not(:disabled) { filter: brightness(1.1); }
+      .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      .btn-sm { padding: 0.5rem 1rem; font-size: 0.875rem; }
+
+      .model-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+        margin-bottom: 0.75rem;
+      }
+
+      .model-info { display: flex; flex-direction: column; gap: 0.25rem; }
+      .model-name { font-weight: 600; }
+      .model-size { font-size: 0.8rem; color: var(--text-muted); }
+
+      .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 0.5rem;
+      }
+
+      .status-dot.online { background: var(--success-color); }
+      .status-dot.offline { background: var(--error-color); }
+      .status-dot.warning { background: var(--warning-color); }
+
+      .progress-section { margin-top: 1rem; }
+
+      .progress-bar-container {
+        height: 8px;
+        background: var(--bg-color);
+        border-radius: 4px;
+        overflow: hidden;
+        margin: 0.5rem 0;
+      }
+
+      .progress-bar {
+        height: 100%;
+        background: var(--primary-color);
+        transition: width 0.3s;
+      }
+
+      .progress-bar.secondary { background: var(--secondary-color); }
+
+      .progress-text { font-size: 0.875rem; color: var(--text-muted); }
+
+      .progress-log {
+        margin-top: 1rem;
+        max-height: 200px;
+        overflow-y: auto;
+        background: var(--bg-color);
+        border-radius: 8px;
+        padding: 1rem;
+        font-family: monospace;
+        font-size: 0.8rem;
+      }
+
+      .log-item { padding: 0.2rem 0; }
+      .log-item.done { color: var(--success-color); }
+      .log-item.error { color: var(--error-color); }
+
+      .chart-container {
+        position: relative;
+        height: 300px;
+        margin: 1rem 0;
+        padding: 1rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+      }
+
+      .training-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+
+      .stat-item {
+        text-align: center;
+        padding: 1rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+      }
+
+      .stat-value { font-size: 1.5rem; font-weight: 700; }
+      .stat-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid var(--border-color);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: var(--text-muted);
+      }
+
+      .section-divider {
+        height: 1px;
+        background: var(--border-color);
+        margin: 1.5rem 0;
+      }
+
+      .form-group {
+        margin-bottom: 1rem;
+      }
+
+      .form-label {
+        display: block;
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        margin-bottom: 0.5rem;
+      }
+
+      .form-input, .form-textarea {
+        width: 100%;
+        padding: 0.75rem;
+        background: var(--bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-color);
+        font-size: 1rem;
+      }
+
+      .form-textarea {
+        min-height: 100px;
+        resize: vertical;
+        font-family: inherit;
+      }
+
+      .form-input:focus, .form-textarea:focus {
+        outline: none;
+        border-color: var(--primary-color);
+      }
+
+      .audio-player {
+        width: 100%;
+        margin-top: 1rem;
+      }
+
+      .phase-indicator {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .phase {
+        flex: 1;
+        padding: 0.5rem;
+        text-align: center;
+        background: var(--bg-color);
+        border-radius: 6px;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+      }
+
+      .phase.active {
+        background: var(--primary-color);
+        color: white;
+      }
+
+      .phase.done {
+        background: var(--success-color);
+        color: white;
+      }
+
+      .gpu-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+      }
+
+      .gpu-badge {
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        background: var(--success-color);
+        color: white;
+      }
+
+      .device-selector {
+        display: flex;
+        gap: 1rem;
+      }
+
+      .device-btn {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 1rem;
+        background: var(--bg-color);
+        border: 2px solid var(--border-color);
+        border-radius: 12px;
+        cursor: default;
+        transition: all 0.2s;
+        color: var(--text-color);
+      }
+
+      .device-btn.active {
+        border-color: var(--primary-color);
+        background: rgba(236, 72, 153, 0.1);
+      }
+
+      .device-btn.disabled {
+        opacity: 0.5;
+      }
+
+      .device-icon {
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+
+      .device-name {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .device-status {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        background: var(--border-color);
+        color: var(--text-muted);
+      }
+
+      .device-status.active {
+        background: var(--primary-color);
+        color: white;
+      }
+
+      .path-info {
+        margin-top: 1rem;
+        padding: 0.75rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+        font-size: 0.8rem;
+      }
+
+      .path-item {
+        display: flex;
+        margin-bottom: 0.5rem;
+      }
+
+      .path-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .path-label {
+        color: var(--text-muted);
+        min-width: 100px;
+        flex-shrink: 0;
+      }
+
+      .path-value {
+        color: var(--text-color);
+        font-family: monospace;
+        word-break: break-all;
+        opacity: 0.8;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="header">
+        <h1 class="title">声音克隆</h1>
+        <div class="nav-links">
+          <span>
+            <span class="status-dot" :class="serviceOnline ? 'online' : 'offline'"></span>
+            {{ serviceOnline ? '服务在线' : '服务离线' }}
+          </span>
+          <a href="maker.html" class="nav-link">AI训练</a>
+          <a href="cleaner.html" class="nav-link">数据清洗</a>
+          <a href="index.html" class="nav-link">视频下载</a>
+        </div>
+      </div>
+
+      <!-- 服务离线 -->
+      <div v-if="!serviceOnline" class="card">
+        <div class="empty-state">
+          <p style="font-size: 1.25rem; margin-bottom: 1rem;">声音克隆服务未启动</p>
+          <code style="display: block; padding: 1rem; background: var(--bg-color); border-radius: 8px; text-align: left;">
+            cd video-analysis-voice-cloning<br>
+            pip install -r requirements.txt<br>
+            python run_server.py
+          </code>
+        </div>
+      </div>
+
+      <template v-if="serviceOnline">
+        <!-- 计算设备 -->
+        <div class="card">
+          <div class="card-title">
+            <span class="status-dot" :class="gpuInfo.available ? 'online' : 'warning'"></span>
+            计算设备
+          </div>
+
+          <div class="device-selector">
+            <button
+              class="device-btn"
+              :class="{ active: currentDevice === 'cuda', disabled: !gpuInfo.available }"
+              :disabled="!gpuInfo.available"
+            >
+              <span class="device-icon">GPU</span>
+              <span class="device-name">{{ gpuInfo.name || 'CUDA' }}</span>
+              <span v-if="!gpuInfo.available" class="device-status">不可用</span>
+              <span v-else-if="currentDevice === 'cuda'" class="device-status active">使用中</span>
+            </button>
+            <button
+              class="device-btn"
+              :class="{ active: currentDevice === 'cpu' }"
+            >
+              <span class="device-icon">CPU</span>
+              <span class="device-name">处理器</span>
+              <span v-if="currentDevice === 'cpu'" class="device-status active">使用中</span>
+            </button>
+          </div>
+
+          <div v-if="gpuInfo.available && gpuInfo.memory_gb" style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
+            显存: {{ gpuInfo.memory_gb }} GB
+          </div>
+        </div>
+
+        <!-- 预训练模型下载 -->
+        <div class="card">
+          <div class="card-title">
+            <span class="status-dot" :class="pretrainedModels.all_ready ? 'online' : 'warning'"></span>
+            预训练模型 (GPT-SoVITS)
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+            声音克隆需要下载预训练模型，总大小约 4GB
+          </p>
+
+          <div class="model-card">
+            <div class="model-info">
+              <div class="model-name">GPT 模型</div>
+              <div class="model-size">s1_pretrained.ckpt (~150MB) - 语音生成</div>
+            </div>
+            <span v-if="pretrainedModels.gpt" style="color: var(--success-color);">已下载</span>
+            <button v-else class="btn btn-sm btn-secondary" :disabled="downloadingModel === 'gpt'" @click="downloadSingleModel('gpt')">
+              <span v-if="downloadingModel === 'gpt'" class="spinner"></span>
+              {{ downloadingModel === 'gpt' ? '下载中...' : '下载' }}
+            </button>
+          </div>
+
+          <div class="model-card">
+            <div class="model-info">
+              <div class="model-name">SoVITS 模型</div>
+              <div class="model-size">s2G_pretrained.pth (~100MB) - 声音合成</div>
+            </div>
+            <span v-if="pretrainedModels.sovits" style="color: var(--success-color);">已下载</span>
+            <button v-else class="btn btn-sm btn-secondary" :disabled="downloadingModel === 'sovits'" @click="downloadSingleModel('sovits')">
+              <span v-if="downloadingModel === 'sovits'" class="spinner"></span>
+              {{ downloadingModel === 'sovits' ? '下载中...' : '下载' }}
+            </button>
+          </div>
+
+          <div class="model-card">
+            <div class="model-info">
+              <div class="model-name">HuBERT 音频特征</div>
+              <div class="model-size">chinese-hubert-base (~400MB) - 音频特征提取</div>
+            </div>
+            <span v-if="pretrainedModels.bert" style="color: var(--success-color);">已下载</span>
+            <button v-else class="btn btn-sm btn-secondary" :disabled="downloadingModel === 'cnhubert'" @click="downloadSingleModel('cnhubert')">
+              <span v-if="downloadingModel === 'cnhubert'" class="spinner"></span>
+              {{ downloadingModel === 'cnhubert' ? '下载中...' : '下载' }}
+            </button>
+          </div>
+
+          <div class="model-card">
+            <div class="model-info">
+              <div class="model-name">RoBERTa 文本处理</div>
+              <div class="model-size">chinese-roberta-wwm-ext-large (~1.3GB) - 文本特征提取</div>
+            </div>
+            <span v-if="pretrainedModels.roberta" style="color: var(--success-color);">已下载</span>
+            <button v-else class="btn btn-sm btn-secondary" :disabled="downloadingModel === 'roberta'" @click="downloadSingleModel('roberta')">
+              <span v-if="downloadingModel === 'roberta'" class="spinner"></span>
+              {{ downloadingModel === 'roberta' ? '下载中...' : '下载' }}
+            </button>
+          </div>
+
+          <div class="model-card">
+            <div class="model-info">
+              <div class="model-name">G2PW 拼音模型</div>
+              <div class="model-size">G2PWModel (~200MB) - 中文多音字处理</div>
+            </div>
+            <span v-if="pretrainedModels.g2pw" style="color: var(--success-color);">已下载</span>
+            <button v-else class="btn btn-sm btn-secondary" :disabled="downloadingModel === 'g2pw'" @click="downloadSingleModel('g2pw')">
+              <span v-if="downloadingModel === 'g2pw'" class="spinner"></span>
+              {{ downloadingModel === 'g2pw' ? '下载中...' : '下载' }}
+            </button>
+          </div>
+
+          <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+            <button
+              v-if="!pretrainedModels.all_ready"
+              class="btn btn-secondary"
+              :disabled="downloadingModels || downloadingModel"
+              @click="downloadPretrainedModels"
+            >
+              <span v-if="downloadingModels" class="spinner"></span>
+              {{ downloadingModels ? '下载中...' : '一键下载全部' }}
+            </button>
+          </div>
+
+          <div v-if="downloadingModels || downloadingModel" class="progress-section">
+            <div class="progress-bar-container">
+              <div class="progress-bar secondary" :style="{ width: modelDownloadPercent + '%' }"></div>
+            </div>
+            <div class="progress-text">{{ modelDownloadMessage }}</div>
+          </div>
+
+          <!-- 路径信息 -->
+          <div class="path-info">
+            <div class="path-item">
+              <span class="path-label">预训练模型:</span>
+              <span class="path-value">{{ paths.pretrained_dir }}</span>
+            </div>
+            <div class="path-item">
+              <span class="path-label">训练模型:</span>
+              <span class="path-value">{{ paths.trained_dir }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 博主选择 -->
+        <div class="card">
+          <div class="card-title">选择博主</div>
+          <div v-if="bloggers.length === 0" class="empty-state">
+            <p>没有找到博主数据，请先下载视频并清洗数据</p>
+          </div>
+          <div v-else class="blogger-list">
+            <div
+              v-for="blogger in bloggers"
+              :key="blogger.name"
+              class="blogger-item"
+              :class="{ selected: selectedBlogger === blogger.name }"
+              @click="selectBlogger(blogger.name)"
+            >
+              <div>
+                <div class="blogger-name">{{ blogger.name }}</div>
+                <div class="blogger-stats">
+                  <span><span class="badge badge-source">{{ blogger.source.file_pairs }}</span> 音频文件</span>
+                  <span v-if="blogger.dataset.prepared">
+                    <span class="badge badge-dataset">{{ blogger.dataset.segments }}</span> 训练片段
+                  </span>
+                  <span v-if="blogger.model.trained">
+                    <span class="badge badge-ready">模型就绪</span>
+                  </span>
+                </div>
+              </div>
+              <div style="display: flex; gap: 0.5rem;">
+                <span v-if="blogger.dataset.prepared" class="badge badge-dataset">数据已准备</span>
+                <span v-if="blogger.model.trained" class="badge badge-model">已训练</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 功能选项卡 -->
+        <div v-if="selectedBlogger" class="card">
+          <div class="tabs">
+            <button class="tab" :class="{ active: activeTab === 'prepare' }" @click="activeTab = 'prepare'">
+              数据准备
+            </button>
+            <button
+              class="tab"
+              :class="{ active: activeTab === 'train', secondary: activeTab === 'train' }"
+              @click="activeTab = 'train'"
+            >
+              模型训练
+            </button>
+            <button
+              class="tab"
+              :class="{ active: activeTab === 'synthesize' }"
+              @click="activeTab = 'synthesize'"
+              style="background: var(--primary-color) !important;"
+              v-if="currentBloggerInfo && currentBloggerInfo.model && currentBloggerInfo.model.ready"
+            >
+              语音合成
+            </button>
+            <button
+              class="tab"
+              :class="{ active: activeTab === 'emotions' }"
+              @click="activeTab = 'emotions'; loadEmotions()"
+              v-if="currentBloggerInfo && currentBloggerInfo.dataset && currentBloggerInfo.dataset.exists"
+            >
+              情绪标注
+            </button>
+            <button
+              class="tab"
+              :class="{ active: activeTab === 'expressions' }"
+              @click="activeTab = 'expressions'; loadExpressions()"
+              v-if="currentBloggerInfo && currentBloggerInfo.dataset && currentBloggerInfo.dataset.exists"
+              style="background: var(--warning-color) !important;"
+            >
+              表情库
+            </button>
+          </div>
+
+          <!-- 数据准备 -->
+          <div v-if="activeTab === 'prepare'">
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+              从清洗后的音频和文本中提取训练数据片段
+            </p>
+
+            <div v-if="currentBloggerInfo">
+              <div class="model-card">
+                <div class="model-info">
+                  <div class="model-name">源数据</div>
+                  <div class="model-size">{{ currentBloggerInfo.source.total_pairs || 0 }} 个音频+文本对</div>
+                </div>
+              </div>
+
+              <div v-if="currentBloggerInfo.dataset.exists" class="model-card">
+                <div class="model-info">
+                  <div class="model-name">训练数据集</div>
+                  <div class="model-size">
+                    {{ currentBloggerInfo.dataset.segment_count }} 个片段,
+                    {{ currentBloggerInfo.dataset.total_duration_minutes }} 分钟
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span style="color: var(--success-color);">已准备</span>
+                  <button
+                    class="btn"
+                    style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background: var(--error-color);"
+                    @click="deleteDataset"
+                    :disabled="preparing"
+                  >删除</button>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center;">
+              <button
+                class="btn btn-primary"
+                :disabled="preparing"
+                @click="startPrepare"
+              >
+                <span v-if="preparing" class="spinner"></span>
+                {{ preparing ? '准备中...' : (currentBloggerInfo && currentBloggerInfo.dataset.exists ? '重新准备数据' : '开始准备数据') }}
+              </button>
+              <label style="display: flex; align-items: center; gap: 0.3rem; color: var(--text-muted); font-size: 0.85rem;">
+                <input type="checkbox" v-model="enableDenoise" style="margin: 0;">
+                启用降噪
+              </label>
+            </div>
+
+            <div v-if="prepareLogs.length > 0" class="progress-section">
+              <div class="progress-bar-container">
+                <div class="progress-bar" :style="{ width: preparePercent + '%' }"></div>
+              </div>
+              <div class="progress-text">{{ prepareMessage }}</div>
+              <div class="progress-log">
+                <div v-for="(log, i) in prepareLogs" :key="i" class="log-item" :class="log.type">
+                  {{ log.message }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 模型训练 -->
+          <div v-if="activeTab === 'train'">
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+              使用 GPT-SoVITS 微调训练声音克隆模型
+            </p>
+
+            <div v-if="!pretrainedModels.all_ready" style="color: var(--warning-color); margin-bottom: 1rem;">
+              请先下载预训练模型
+            </div>
+
+            <div v-else-if="!currentBloggerInfo || !currentBloggerInfo.dataset.exists" style="color: var(--warning-color); margin-bottom: 1rem;">
+              请先准备训练数据
+            </div>
+
+            <template v-else>
+              <!-- 训练阶段指示器 -->
+              <div v-if="training" class="phase-indicator">
+                <div class="phase" :class="{ active: trainingPhase === 'gpt', done: trainingPhase === 'sovits' || trainingDone }">
+                  Phase 1: GPT
+                </div>
+                <div class="phase" :class="{ active: trainingPhase === 'sovits', done: trainingDone }">
+                  Phase 2: SoVITS
+                </div>
+              </div>
+
+              <button
+                class="btn btn-secondary"
+                :disabled="training || !pretrainedModels.all_ready"
+                @click="startTraining"
+              >
+                <span v-if="training" class="spinner"></span>
+                {{ training ? '训练中...' : '开始训练' }}
+              </button>
+
+              <!-- 训练进度 -->
+              <div v-if="training || trainingDone" class="progress-section">
+                <div class="progress-bar-container">
+                  <div class="progress-bar secondary" :style="{ width: trainingPercent + '%' }"></div>
+                </div>
+                <div class="progress-text">{{ trainingMessage }}</div>
+
+                <!-- Loss 曲线图表 -->
+                <div class="chart-container">
+                  <canvas id="lossChart"></canvas>
+                </div>
+
+                <!-- 训练统计 -->
+                <div class="training-stats">
+                  <div class="stat-item">
+                    <div class="stat-value" style="color: var(--secondary-color);">{{ currentEpoch }}</div>
+                    <div class="stat-label">Epoch</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-value" style="color: var(--primary-color);">{{ currentLoss }}</div>
+                    <div class="stat-label">Loss</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-value">{{ trainingElapsed }}</div>
+                    <div class="stat-label">耗时 (秒)</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-value" style="color: var(--success-color);">{{ trainingPercent }}%</div>
+                    <div class="stat-label">进度</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 训练完成 -->
+              <div v-if="trainingDone" style="margin-top: 1rem; padding: 1rem; background: rgba(16, 185, 129, 0.1); border-radius: 8px; color: var(--success-color);">
+                训练完成！模型已保存，可以进行语音合成测试。
+              </div>
+
+              <!-- 已训练模型路径 -->
+              <div v-if="currentBloggerInfo && currentBloggerInfo.model && currentBloggerInfo.model.ready" class="path-info" style="margin-top: 1rem;">
+                <div class="path-item">
+                  <span class="path-label">GPT 模型:</span>
+                  <span class="path-value">{{ currentBloggerInfo.model.models.gpt.path || '-' }}</span>
+                </div>
+                <div class="path-item">
+                  <span class="path-label">SoVITS 模型:</span>
+                  <span class="path-value">{{ currentBloggerInfo.model.models.sovits.path || '-' }}</span>
+                </div>
+                <button
+                  class="btn"
+                  style="margin-top: 0.5rem; padding: 0.25rem 0.5rem; font-size: 0.75rem; background: var(--error-color);"
+                  @click="deleteModel"
+                  :disabled="training"
+                >删除已训练模型</button>
+              </div>
+            </template>
+          </div>
+
+          <!-- 语音合成 -->
+          <div v-if="activeTab === 'synthesize'">
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+              使用训练好的模型合成语音
+            </p>
+
+            <div class="form-group">
+              <label class="form-label">输入文本</label>
+              <textarea
+                class="form-textarea"
+                v-model="synthesizeText"
+                placeholder="请输入要合成的文本..."
+              ></textarea>
+            </div>
+
+
+            <div class="form-group">
+              <label class="form-label">语速: {{ synthesizeSpeed }}</label>
+              <input
+                type="range"
+                min="0.5"
+                max="2.0"
+                step="0.1"
+                v-model="synthesizeSpeed"
+                style="width: 100%;"
+              >
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">情绪风格</label>
+              <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                <button
+                  v-for="(info, key) in emotionTypes"
+                  :key="key"
+                  class="btn btn-sm"
+                  :class="synthesizeEmotion === key ? 'btn-primary' : ''"
+                  :style="synthesizeEmotion !== key ? 'background: var(--bg-color); color: var(--text-muted);' : ''"
+                  @click="synthesizeEmotion = key"
+                  :title="info.description"
+                >
+                  {{ info.name }}
+                </button>
+              </div>
+              <div style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">
+                提示：在"情绪标注"中为参考音频标记情绪，合成时会选择相应情绪的参考音频
+              </div>
+            </div>
+
+            <button
+              class="btn btn-primary"
+              :disabled="synthesizing || !synthesizeText"
+              @click="startSynthesize"
+            >
+              <span v-if="synthesizing" class="spinner"></span>
+              {{ synthesizing ? '合成中...' : '合成语音' }}
+            </button>
+
+            <!-- 合成结果 -->
+            <div v-if="synthesizeResult" style="margin-top: 1rem;">
+              <div class="model-card">
+                <div class="model-info">
+                  <div class="model-name">合成完成</div>
+                  <div class="model-size">
+                    时长: {{ synthesizeResult.duration_seconds }}s |
+                    耗时: {{ synthesizeResult.elapsed_seconds }}s
+                  </div>
+                </div>
+              </div>
+              <audio
+                class="audio-player"
+                controls
+                :src="'data:audio/wav;base64,' + synthesizeResult.audio_base64"
+              ></audio>
+            </div>
+
+            <div v-if="synthesizeError" style="margin-top: 1rem; color: var(--error-color);">
+              {{ synthesizeError }}
+            </div>
+          </div>
+
+          <!-- 情绪标注 -->
+          <div v-if="activeTab === 'emotions'">
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+              为参考音频标注情绪，合成时会根据选择的情绪使用对应的参考音频
+            </p>
+
+            <div v-if="loadingEmotions" style="text-align: center; padding: 2rem;">
+              <span class="spinner"></span> 加载中...
+            </div>
+
+            <template v-else>
+              <!-- 情绪统计 -->
+              <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+                <div
+                  v-for="(info, key) in emotionTypes"
+                  :key="key"
+                  style="padding: 0.5rem 1rem; background: var(--bg-color); border-radius: 8px; font-size: 0.85rem;"
+                >
+                  <span style="color: var(--text-muted);">{{ info.name }}:</span>
+                  <span style="font-weight: 600; color: var(--primary-color);">{{ emotionStats[key] || 0 }}</span>
+                </div>
+              </div>
+
+              <!-- 音频列表 -->
+              <div style="max-height: 400px; overflow-y: auto;">
+                <div
+                  v-for="audio in emotionAudios"
+                  :key="audio.filename"
+                  class="model-card"
+                  style="flex-wrap: wrap;"
+                >
+                  <div class="model-info" style="flex: 1; min-width: 200px;">
+                    <div class="model-name">{{ audio.filename }}</div>
+                    <div class="model-size">{{ audio.text }}</div>
+                    <div class="model-size">时长: {{ audio.duration }}s</div>
+                  </div>
+                  <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center;">
+                    <button
+                      v-for="(info, key) in emotionTypes"
+                      :key="key"
+                      class="btn"
+                      :class="audio.emotion === key ? 'btn-primary' : ''"
+                      :style="audio.emotion !== key ? 'background: var(--border-color); color: var(--text-muted); padding: 0.3rem 0.6rem; font-size: 0.75rem;' : 'padding: 0.3rem 0.6rem; font-size: 0.75rem;'"
+                      @click="tagEmotion(audio.filename, key)"
+                    >
+                      {{ info.name }}
+                    </button>
+                  </div>
+                  <audio
+                    controls
+                    crossorigin="anonymous"
+                    preload="metadata"
+                    :src="API + '/audio/' + encodeURIComponent(selectedBlogger) + '/' + encodeURIComponent(audio.filename)"
+                    style="width: 100%; margin-top: 0.5rem; height: 32px;"
+                  ></audio>
+                </div>
+              </div>
+
+              <div v-if="emotionAudios.length === 0" class="empty-state">
+                没有可用的参考音频（需要时长在 3-10 秒之间）
+              </div>
+            </template>
+          </div>
+
+          <!-- 表情库 -->
+          <div v-if="activeTab === 'expressions'">
+            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+              收集笑声、语气词等真实录音，合成时自动插入，让声音更自然有趣
+            </p>
+
+            <div v-if="loadingExpressions" style="text-align: center; padding: 2rem;">
+              <span class="spinner"></span> 加载中...
+            </div>
+
+            <template v-else>
+              <!-- 表情类型统计 -->
+              <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem;">
+                <div
+                  v-for="(info, key) in expressionTypes"
+                  :key="key"
+                  style="padding: 0.75rem 1rem; background: var(--bg-color); border-radius: 8px; border-left: 3px solid;"
+                  :style="{ borderColor: info.color }"
+                >
+                  <div style="font-weight: 600;">{{ info.name }}</div>
+                  <div style="font-size: 0.8rem; color: var(--text-muted);">{{ info.description }}</div>
+                  <div style="margin-top: 0.25rem;">
+                    <span style="font-size: 1.25rem; font-weight: 700;" :style="{ color: info.color }">{{ expressionStats[key] || 0 }}</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);"> 个片段</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 已收集的片段列表 -->
+              <div v-if="expressionClips.length > 0">
+                <div class="card-title">已收集的表情片段</div>
+                <div style="max-height: 300px; overflow-y: auto;">
+                  <div
+                    v-for="clip in expressionClips"
+                    :key="clip.id"
+                    class="model-card"
+                  >
+                    <div class="model-info">
+                      <div class="model-name">
+                        <span
+                          class="badge"
+                          :style="{ background: expressionTypes[clip.expression_type]?.color || '#666' }"
+                        >{{ expressionTypes[clip.expression_type]?.name || clip.expression_type }}</span>
+                        {{ clip.text }}
+                      </div>
+                      <div class="model-size">时长: {{ clip.duration }}s | 来源: {{ clip.source_file.split('/').pop() }}</div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                      <audio
+                        controls
+                        crossorigin="anonymous"
+                        preload="metadata"
+                        :src="API + '/expressions/' + encodeURIComponent(selectedBlogger) + '/audio/' + clip.id"
+                        style="height: 32px; width: 150px;"
+                      ></audio>
+                      <button
+                        class="btn btn-sm"
+                        style="background: var(--error-color);"
+                        @click="deleteExpression(clip.id)"
+                      >删除</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 从参考音频中提取 -->
+              <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-color); border-radius: 8px;">
+                <div class="card-title" style="margin-bottom: 0.75rem;">如何收集表情片段</div>
+                <ol style="color: var(--text-muted); font-size: 0.9rem; padding-left: 1.25rem; margin: 0;">
+                  <li style="margin-bottom: 0.5rem;">在"情绪标注"中找到包含笑声/语气词的音频</li>
+                  <li style="margin-bottom: 0.5rem;">记下笑声的开始和结束时间（秒）</li>
+                  <li style="margin-bottom: 0.5rem;">使用 API 提取：POST /api/voice/expressions/{blogger}/extract</li>
+                  <li>合成时会自动用真实录音替换文本中的表情词</li>
+                </ol>
+                <div style="margin-top: 1rem; padding: 0.75rem; background: var(--card-bg); border-radius: 6px; font-size: 0.8rem; font-family: monospace;">
+                  触发词: {{ Object.values(expressionTypes).map(t => t.triggers?.join(', ')).join(' | ') }}
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+      var API = 'http://localhost:8003/api/voice';
+      var lossChart = null;
+
+      var app = Vue.createApp({
+        data: function() {
+          return {
+            serviceOnline: false,
+            gpuInfo: { available: false, name: null, memory_gb: null },
+            currentDevice: 'cpu',
+            pretrainedModels: { all_ready: false, gpt: false, sovits: false, bert: false, roberta: false, g2pw: false },
+            paths: { pretrained_dir: '', trained_dir: '', datasets_dir: '' },
+
+            downloadingModels: false,
+            downloadingModel: null,  // 单个模型下载中
+            modelDownloadPercent: 0,
+            modelDownloadMessage: '',
+
+            bloggers: [],
+            selectedBlogger: null,
+            currentBloggerInfo: null,
+            activeTab: 'prepare',
+
+            // 数据准备
+            preparing: false,
+            prepareLogs: [],
+            preparePercent: 0,
+            prepareMessage: '',
+            enableDenoise: true,  // 默认启用降噪
+
+            // 训练
+            training: false,
+            trainingPhase: '',
+            trainingPercent: 0,
+            trainingMessage: '',
+            trainingDone: false,
+            currentEpoch: 0,
+            currentLoss: '-',
+            trainingElapsed: 0,
+            gptLosses: [],
+            sovitsLosses: [],
+
+            // 合成
+            synthesizeText: '',
+            synthesizeSpeed: 1.0,
+            synthesizeEmotion: 'neutral',
+            synthesizing: false,
+            synthesizeResult: null,
+            synthesizeError: null,
+
+            // 情绪管理
+            emotionTypes: {},
+            emotionAudios: [],
+            emotionStats: {},
+            loadingEmotions: false,
+
+            // 表情库
+            expressionTypes: {},
+            expressionClips: [],
+            expressionStats: {},
+            loadingExpressions: false,
+          };
+        },
+        mounted: function() {
+          this.checkService();
+        },
+        methods: {
+          checkService: function() {
+            var vm = this;
+            fetch(API + '/status')
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                vm.serviceOnline = true;
+                vm.gpuInfo = data.gpu || { available: false, name: null, memory_gb: null };
+                vm.currentDevice = data.device || 'cpu';
+                vm.pretrainedModels = data.pretrained_models;
+                vm.paths = data.paths || { pretrained_dir: '', trained_dir: '', datasets_dir: '' };
+                vm.loadBloggers();
+                vm.loadEmotionTypes();
+              })
+              .catch(function() {
+                vm.serviceOnline = false;
+              });
+          },
+
+          loadBloggers: function() {
+            var vm = this;
+            fetch(API + '/bloggers')
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                vm.bloggers = data.bloggers;
+              });
+          },
+
+          selectBlogger: function(name) {
+            var vm = this;
+            vm.selectedBlogger = name;
+            vm.prepareLogs = [];
+            vm.trainingDone = false;
+            vm.gptLosses = [];
+            vm.sovitsLosses = [];
+
+            // 获取博主详情
+            fetch(API + '/blogger/' + encodeURIComponent(name))
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                vm.currentBloggerInfo = data;
+                if (data.model && data.model.ready) {
+                  vm.activeTab = 'synthesize';
+                } else if (data.dataset && data.dataset.exists) {
+                  vm.activeTab = 'train';
+                } else {
+                  vm.activeTab = 'prepare';
+                }
+              });
+          },
+
+          downloadPretrainedModels: function() {
+            var vm = this;
+            vm.downloadingModels = true;
+            vm.modelDownloadPercent = 0;
+            vm.modelDownloadMessage = '准备下载...';
+
+            fetch(API + '/models/download', { method: 'POST' })
+              .then(function(response) {
+                var reader = response.body.getReader();
+                var decoder = new TextDecoder();
+
+                function read() {
+                  reader.read().then(function(result) {
+                    if (result.done) {
+                      vm.downloadingModels = false;
+                      vm.checkService();
+                      return;
+                    }
+
+                    var lines = decoder.decode(result.value).split('\n');
+                    lines.forEach(function(line) {
+                      if (line.startsWith('data: ')) {
+                        try {
+                          var data = JSON.parse(line.substring(6));
+                          if (data.percent !== undefined) {
+                            vm.modelDownloadPercent = data.percent;
+                          }
+                          if (data.message) {
+                            vm.modelDownloadMessage = data.message;
+                          }
+                          if (data.type === 'done') {
+                            vm.downloadingModels = false;
+                            vm.checkService();
+                          }
+                          if (data.type === 'error') {
+                            vm.downloadingModels = false;
+                            vm.modelDownloadMessage = '下载失败: ' + data.message;
+                          }
+                        } catch (e) {}
+                      }
+                    });
+                    read();
+                  });
+                }
+                read();
+              });
+          },
+
+          downloadSingleModel: function(modelKey) {
+            var vm = this;
+            vm.downloadingModel = modelKey;
+            vm.modelDownloadPercent = 0;
+            vm.modelDownloadMessage = '准备下载 ' + modelKey + '...';
+
+            fetch(API + '/models/download/' + modelKey, { method: 'POST' })
+              .then(function(response) {
+                var reader = response.body.getReader();
+                var decoder = new TextDecoder();
+
+                function read() {
+                  reader.read().then(function(result) {
+                    if (result.done) {
+                      vm.downloadingModel = null;
+                      vm.checkService();
+                      return;
+                    }
+
+                    var lines = decoder.decode(result.value).split('\n');
+                    lines.forEach(function(line) {
+                      if (line.startsWith('data: ')) {
+                        try {
+                          var data = JSON.parse(line.substring(6));
+                          if (data.percent !== undefined) {
+                            vm.modelDownloadPercent = data.percent;
+                          }
+                          if (data.message) {
+                            vm.modelDownloadMessage = data.message;
+                          }
+                          if (data.type === 'done') {
+                            vm.downloadingModel = null;
+                            vm.checkService();
+                          }
+                          if (data.type === 'error') {
+                            vm.downloadingModel = null;
+                            vm.modelDownloadMessage = '下载失败: ' + data.message;
+                          }
+                        } catch (e) {}
+                      }
+                    });
+                    read();
+                  });
+                }
+                read();
+              });
+          },
+
+          startPrepare: function() {
+            var vm = this;
+            vm.preparing = true;
+            vm.prepareLogs = [];
+            vm.preparePercent = 0;
+            vm.prepareMessage = '开始准备数据...';
+
+            fetch(API + '/prepare', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                blogger_name: vm.selectedBlogger,
+                enable_denoise: vm.enableDenoise,
+              }),
+            }).then(function(response) {
+              var reader = response.body.getReader();
+              var decoder = new TextDecoder();
+
+              function read() {
+                reader.read().then(function(result) {
+                  if (result.done) {
+                    vm.preparing = false;
+                    vm.selectBlogger(vm.selectedBlogger);
+                    return;
+                  }
+
+                  var lines = decoder.decode(result.value).split('\n');
+                  lines.forEach(function(line) {
+                    if (line.startsWith('data: ')) {
+                      try {
+                        var data = JSON.parse(line.substring(6));
+                        if (data.percent !== undefined) {
+                          vm.preparePercent = data.percent;
+                        }
+                        if (data.message) {
+                          vm.prepareMessage = data.message;
+                          vm.prepareLogs.push({ type: data.type, message: data.message });
+                        }
+                        if (data.type === 'done') {
+                          vm.preparing = false;
+                          vm.preparePercent = 100;
+                        }
+                        if (data.type === 'error') {
+                          vm.preparing = false;
+                        }
+                      } catch (e) {}
+                    }
+                  });
+                  read();
+                });
+              }
+              read();
+            });
+          },
+
+          initChart: function() {
+            var ctx = document.getElementById('lossChart');
+            if (!ctx) return;
+
+            if (lossChart) {
+              lossChart.destroy();
+            }
+
+            lossChart = new Chart(ctx.getContext('2d'), {
+              type: 'line',
+              data: {
+                labels: [],
+                datasets: [
+                  {
+                    label: 'GPT Loss',
+                    data: [],
+                    borderColor: '#8b5cf6',
+                    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                  },
+                  {
+                    label: 'SoVITS Loss',
+                    data: [],
+                    borderColor: '#ec4899',
+                    backgroundColor: 'rgba(236, 72, 153, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                  },
+                ],
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 0 },
+                scales: {
+                  x: {
+                    title: { display: true, text: 'Epoch', color: 'rgba(255,255,255,0.6)' },
+                    ticks: { color: 'rgba(255,255,255,0.6)' },
+                    grid: { color: 'rgba(255,255,255,0.1)' },
+                  },
+                  y: {
+                    title: { display: true, text: 'Loss', color: 'rgba(255,255,255,0.6)' },
+                    ticks: { color: 'rgba(255,255,255,0.6)' },
+                    grid: { color: 'rgba(255,255,255,0.1)' },
+                  },
+                },
+                plugins: {
+                  legend: {
+                    labels: { color: 'rgba(255,255,255,0.87)' },
+                  },
+                },
+              },
+            });
+          },
+
+          updateChart: function() {
+            if (!lossChart) return;
+
+            var maxLen = Math.max(this.gptLosses.length, this.sovitsLosses.length);
+            var labels = [];
+            for (var i = 1; i <= maxLen; i++) {
+              labels.push('E' + i);
+            }
+
+            lossChart.data.labels = labels;
+            lossChart.data.datasets[0].data = this.gptLosses;
+            lossChart.data.datasets[1].data = this.sovitsLosses;
+            lossChart.update();
+          },
+
+          startTraining: function() {
+            var vm = this;
+            vm.training = true;
+            vm.trainingDone = false;
+            vm.trainingPhase = 'gpt';
+            vm.trainingPercent = 0;
+            vm.trainingMessage = '开始训练...';
+            vm.currentEpoch = 0;
+            vm.currentLoss = '-';
+            vm.trainingElapsed = 0;
+            vm.gptLosses = [];
+            vm.sovitsLosses = [];
+
+            // 初始化图表
+            vm.$nextTick(function() {
+              vm.initChart();
+            });
+
+            fetch(API + '/train', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ blogger_name: vm.selectedBlogger }),
+            }).then(function(response) {
+              var reader = response.body.getReader();
+              var decoder = new TextDecoder();
+
+              function read() {
+                reader.read().then(function(result) {
+                  if (result.done) {
+                    vm.training = false;
+                    vm.selectBlogger(vm.selectedBlogger);
+                    return;
+                  }
+
+                  var lines = decoder.decode(result.value).split('\n');
+                  lines.forEach(function(line) {
+                    if (line.startsWith('data: ')) {
+                      try {
+                        var data = JSON.parse(line.substring(6));
+
+                        if (data.type === 'phase') {
+                          vm.trainingPhase = data.phase;
+                          vm.trainingMessage = data.message;
+                        }
+
+                        if (data.type === 'progress') {
+                          vm.trainingPhase = data.phase;
+                          vm.currentEpoch = data.epoch + '/' + data.total_epochs;
+                          vm.currentLoss = data.loss || 0;
+                          vm.trainingElapsed = data.elapsed_seconds;
+                          vm.trainingPercent = Math.round(data.percent || 0);
+                          // 构建消息
+                          var msg = data.phase.toUpperCase() + ' - Epoch ' + data.epoch + '/' + data.total_epochs;
+                          if (data.step && data.total_steps) {
+                            msg += ' Step ' + data.step + '/' + data.total_steps;
+                          }
+                          if (data.loss && data.loss > 0) {
+                            msg += ' Loss: ' + data.loss.toFixed(2);
+                          }
+                          vm.trainingMessage = msg;
+                        }
+
+                        if (data.type === 'epoch_done') {
+                          if (data.phase === 'gpt') {
+                            vm.gptLosses.push(data.avg_loss);
+                          } else if (data.phase === 'sovits') {
+                            vm.sovitsLosses.push(data.avg_loss);
+                          }
+                          vm.updateChart();
+                        }
+
+                        if (data.type === 'done') {
+                          vm.training = false;
+                          vm.trainingDone = true;
+                          vm.trainingPercent = 100;
+                          vm.trainingMessage = data.message;
+                        }
+
+                        if (data.type === 'error') {
+                          vm.training = false;
+                          vm.trainingMessage = '错误: ' + data.message;
+                        }
+                      } catch (e) {}
+                    }
+                  });
+                  read();
+                });
+              }
+              read();
+            });
+          },
+
+          startSynthesize: function() {
+            var vm = this;
+            vm.synthesizing = true;
+            vm.synthesizeResult = null;
+            vm.synthesizeError = null;
+
+            fetch(API + '/synthesize', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                blogger_name: vm.selectedBlogger,
+                text: vm.synthesizeText,
+                speed: parseFloat(vm.synthesizeSpeed),
+                emotion: vm.synthesizeEmotion,
+              }),
+            })
+              .then(function(r) {
+                if (!r.ok) {
+                  return r.json().then(function(err) {
+                    throw new Error(err.detail || '合成失败');
+                  });
+                }
+                return r.json();
+              })
+              .then(function(data) {
+                vm.synthesizing = false;
+                if (data.success) {
+                  vm.synthesizeResult = data;
+                } else {
+                  vm.synthesizeError = data.error || '合成失败';
+                }
+              })
+              .catch(function(err) {
+                vm.synthesizing = false;
+                vm.synthesizeError = err.message;
+              });
+          },
+
+          deleteDataset: function() {
+            var vm = this;
+            if (!confirm('确定要删除准备好的训练数据吗？\n删除后需要重新准备数据。')) {
+              return;
+            }
+
+            fetch(API + '/dataset/' + encodeURIComponent(vm.selectedBlogger), {
+              method: 'DELETE',
+            })
+              .then(function(r) {
+                if (!r.ok) {
+                  return r.json().then(function(err) {
+                    throw new Error(err.detail || '删除失败');
+                  });
+                }
+                return r.json();
+              })
+              .then(function(data) {
+                alert(data.message || '删除成功');
+                vm.selectBlogger(vm.selectedBlogger);
+              })
+              .catch(function(err) {
+                alert('删除失败: ' + err.message);
+              });
+          },
+
+          deleteModel: function() {
+            var vm = this;
+            if (!confirm('确定要删除已训练的模型吗？\n删除后需要重新训练。')) {
+              return;
+            }
+
+            fetch(API + '/model/' + encodeURIComponent(vm.selectedBlogger), {
+              method: 'DELETE',
+            })
+              .then(function(r) {
+                if (!r.ok) {
+                  return r.json().then(function(err) {
+                    throw new Error(err.detail || '删除失败');
+                  });
+                }
+                return r.json();
+              })
+              .then(function(data) {
+                alert(data.message || '删除成功');
+                vm.selectBlogger(vm.selectedBlogger);
+              })
+              .catch(function(err) {
+                alert('删除失败: ' + err.message);
+              });
+          },
+
+          loadEmotionTypes: function() {
+            var vm = this;
+            fetch(API + '/emotions')
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                vm.emotionTypes = data.emotions || {};
+              });
+          },
+
+          loadEmotions: function() {
+            var vm = this;
+            if (!vm.selectedBlogger) return;
+
+            vm.loadingEmotions = true;
+            fetch(API + '/emotions/' + encodeURIComponent(vm.selectedBlogger) + '/audios')
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                vm.emotionAudios = data.audios || [];
+                vm.emotionStats = data.statistics || {};
+                vm.emotionTypes = data.emotion_types || vm.emotionTypes;
+                vm.loadingEmotions = false;
+              })
+              .catch(function(err) {
+                vm.loadingEmotions = false;
+                console.error('加载情绪数据失败:', err);
+              });
+          },
+
+          tagEmotion: function(filename, emotion) {
+            var vm = this;
+            fetch(API + '/emotions/' + encodeURIComponent(vm.selectedBlogger) + '/tag', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                filename: filename,
+                emotion: emotion,
+              }),
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                // 更新本地数据
+                vm.emotionAudios.forEach(function(audio) {
+                  if (audio.filename === filename) {
+                    audio.emotion = emotion;
+                    audio.emotion_name = vm.emotionTypes[emotion]?.name || emotion;
+                  }
+                });
+                // 更新统计
+                vm.loadEmotions();
+              })
+              .catch(function(err) {
+                alert('标注失败: ' + err.message);
+              });
+          },
+
+          loadExpressions: function() {
+            var vm = this;
+            if (!vm.selectedBlogger) return;
+
+            vm.loadingExpressions = true;
+            fetch(API + '/expressions/' + encodeURIComponent(vm.selectedBlogger))
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                vm.expressionClips = data.clips || [];
+                vm.expressionStats = data.statistics || {};
+                vm.expressionTypes = data.types || {};
+                vm.loadingExpressions = false;
+              })
+              .catch(function(err) {
+                vm.loadingExpressions = false;
+                console.error('加载表情库失败:', err);
+              });
+          },
+
+          deleteExpression: function(clipId) {
+            var vm = this;
+            if (!confirm('确定要删除这个表情片段吗？')) return;
+
+            fetch(API + '/expressions/' + encodeURIComponent(vm.selectedBlogger) + '/' + clipId, {
+              method: 'DELETE',
+            })
+              .then(function(r) { return r.json(); })
+              .then(function() {
+                vm.loadExpressions();
+              })
+              .catch(function(err) {
+                alert('删除失败: ' + err.message);
+              });
+          },
+        },
+      });
+
+      app.mount('#app');
+    </script>
+  </body>
+</html>

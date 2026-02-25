@@ -1,0 +1,26 @@
+# 信息提取规则
+
+extract_types:
+  person_name:
+    description: "人名识别"
+    patterns:
+      - "(我朋友|我同事|我老板|我家人)(?:叫|是|名字)(.+?)(?:，|。|,|\.|\s|$)"
+      - "(?:叫|是)(.+?)(?:的|，|。)"
+
+  location:
+    description: "地点识别"
+    patterns:
+      - "在(.+?)(?:的|，|。|,|\.|\s)"
+      - "去过(.+?)(?:的|，|。)"
+
+  event:
+    description: "事件识别"
+    time_indicators: ["今天", "昨天", "前天", "上周", "上个月", "去年", "最近"]
+
+  preference:
+    description: "偏好识别"
+    indicators: ["喜欢", "讨厌", "偏好", "习惯", "爱", "不喜欢", "经常"]
+
+  relationship:
+    description: "关系识别"
+    relation_words: ["朋友", "同事", "老板", "家人", "老婆", "老公", "女朋友", "男朋友"]

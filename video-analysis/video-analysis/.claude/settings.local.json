@@ -1,35 +1,21 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pip install:*)",
-      "Bash(conda create:*)",
-      "Bash(conda activate:*)",
-      "Bash(conda run:*)",
-      "Bash(curl:*)",
-      "Bash(conda install:*)",
-      "Bash(netstat:*)",
-      "Bash(findstr:*)",
-      "Bash(taskkill:*)",
-      "Bash(cmd //c:*)",
-      "Bash(powershell:*)",
-      "Bash(powershell.exe:*)",
-      "Bash(\"D:/ProgramData/anaconda3/envs/video-analysis/python.exe\" /d/Work/video-analysis/video-analysis-python/run_server.py)",
-      "Bash(npm run dev:*)",
+      "Bash",
+      "Edit",
+      "Write",
+      "Read",
+      "Glob",   "Grep",
       "WebSearch",
-      "Bash(\"D:/ProgramData/anaconda3/envs/video-analysis/python.exe\" -c \"import yt_dlp; print\\(yt_dlp.version.__version__\\)\")",
-      "WebFetch(domain:github.com)",
-      "Bash(\"D:/ProgramData/anaconda3/envs/video-analysis/python.exe\" -m pip install httpx --quiet)",
-      "Bash(\"D:/ProgramData/anaconda3/envs/video-analysis/python.exe\" -c:*)",
-      "Bash(\"D:/ProgramData/anaconda3/envs/video-analysis/python.exe\":*)",
-      "WebFetch(domain:blog.csdn.net)",
-      "Bash(\"D:/ProgramData/anaconda3/envs/video-analysis/python.exe\" -c \"\nimport httpx\nimport asyncio\nimport json\n\nasync def test\\(\\):\n    video_id = ''7602202332164916864''\n    \n    # 使用 iesdouyin API\n    api_url = f''https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids={video_id}''\n    \n    headers = {\n        ''User-Agent'': ''Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/120.0.0.0 Safari/537.36'',\n        ''Referer'': ''https://www.iesdouyin.com/'',\n    }\n    \n    async with httpx.AsyncClient\\(headers=headers, follow_redirects=True\\) as client:\n        resp = await client.get\\(api_url, timeout=15\\)\n        print\\(f''Status: {resp.status_code}''\\)\n        print\\(f''Content-Type: {resp.headers.get\\(\"\"content-type\"\"\\)}''\\)\n        \n        if resp.status_code == 200:\n            try:\n                data = resp.json\\(\\)\n                print\\(json.dumps\\(data, ensure_ascii=False, indent=2\\)[:2000]\\)\n            except:\n                print\\(f''Response text: {resp.text[:500]}''\\)\n        else:\n            print\\(f''Response: {resp.text[:500]}''\\)\n\nasyncio.run\\(test\\(\\)\\)\n\")",
-      "Bash(\"D:/ProgramData/anaconda3/envs/video-analysis/python.exe\" -c \"\nimport httpx\nimport asyncio\nimport re\nimport json\n\nasync def test\\(\\):\n    # 首先，我们需要获取分享短链\n    # 但用户给的是完整链接，让我尝试用不同方式提取视频\n    \n    video_id = ''7602202332164916864''\n    \n    # 尝试移动端 API\n    mobile_headers = {\n        ''User-Agent'': ''com.ss.android.ugc.aweme/110101 \\(Linux; U; Android 10; zh_CN; Pixel 4; Build/QQ3A.200805.001; Cronet/58.0.2991.0\\)'',\n        ''Accept'': ''application/json'',\n    }\n    \n    # 尝试抖音移动端 API  \n    mobile_api = f''https://api-h2.amemv.com/aweme/v1/aweme/detail/?aweme_id={video_id}''\n    \n    async with httpx.AsyncClient\\(headers=mobile_headers, follow_redirects=True\\) as client:\n        try:\n            resp = await client.get\\(mobile_api, timeout=15\\)\n            print\\(f''Mobile API Status: {resp.status_code}''\\)\n            if resp.text:\n                print\\(f''Response: {resp.text[:1000]}''\\)\n        except Exception as e:\n            print\\(f''Mobile API Error: {e}''\\)\n        \n        # 尝试 TikTok API \\(因为用户说TikTok能下载\\)\n        # 也许可以通过 TikTok 的方式访问抖音内容\n        print\\(''---''\\)\n        \n        # 尝试 webapp 的 SSR endpoint  \n        ssr_headers = {\n            ''User-Agent'': ''Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/120.0.0.0 Safari/537.36'',\n            ''Cookie'': ''ttwid=1|test|1234567890|abcdef;'',  # 伪造一个 ttwid\n        }\n        \n        # 尝试 note endpoint\n        note_url = f''https://www.douyin.com/note/{video_id}''\n        try:\n            resp = await client.get\\(note_url, headers=ssr_headers, timeout=15\\)\n            print\\(f''Note URL Status: {resp.status_code}''\\)\n            print\\(f''Note URL Redirect: {resp.url}''\\)\n        except Exception as e:\n            print\\(f''Note URL Error: {e}''\\)\n\nasyncio.run\\(test\\(\\)\\)\n\")",
-      "Bash(\"D:/ProgramData/anaconda3/envs/video-analysis/python.exe\" -m pip install browser_cookie3 --quiet)",
-      "Bash(\"D:/ProgramData/anaconda3/envs/video-analysis/python.exe\" -c \"\nimport os\nfrom pathlib import Path\n\n# 检查 Firefox 是否安装\nappdata = os.environ.get\\(''APPDATA'', ''''\\)\nfirefox_profiles = Path\\(appdata\\) / ''Mozilla'' / ''Firefox'' / ''Profiles''\n\nif firefox_profiles.exists\\(\\):\n    profiles = list\\(firefox_profiles.iterdir\\(\\)\\)\n    print\\(f''Firefox profiles found: {len\\(profiles\\)}''\\)\n    for p in profiles:\n        print\\(f''  - {p.name}''\\)\n        cookies_file = p / ''cookies.sqlite''\n        if cookies_file.exists\\(\\):\n            print\\(f''    cookies.sqlite exists \\({cookies_file.stat\\(\\).st_size} bytes\\)''\\)\nelse:\n    print\\(''Firefox not found''\\)\n\n# 检查 Edge/Chrome cookie 路径\nlocal_appdata = os.environ.get\\(''LOCALAPPDATA'', ''''\\)\nedge_cookies = Path\\(local_appdata\\) / ''Microsoft'' / ''Edge'' / ''User Data'' / ''Default'' / ''Network'' / ''Cookies''\nchrome_cookies = Path\\(local_appdata\\) / ''Google'' / ''Chrome'' / ''User Data'' / ''Default'' / ''Network'' / ''Cookies''\n\nprint\\(f''Edge cookies exists: {edge_cookies.exists\\(\\)}''\\)\nprint\\(f''Chrome cookies exists: {chrome_cookies.exists\\(\\)}''\\)\n\")",
-      "Bash(\"D:/ProgramData/anaconda3/envs/video-analysis/python.exe\" -m pip install playwright --quiet)",
-      "Bash(\"D:/ProgramData/anaconda3/envs/video-analysis/python.exe\" -m playwright install:*)",
-      "Bash(\"D:/ProgramData/anaconda3/envs/video-analysis/python.exe\" -m playwright install chromium)",
-      "Bash(\"D:/ProgramData/anaconda3/envs/video-analysis/Library/bin/ffmpeg.exe\" -version)"
+      "WebFetch(domain:*)",
+      "Task",
+      "TodoWrite",
+      "NotebookEdit",
+      "mcp__*"
+    ],
+    "deny": [
+      "Bash(git push:*)",
+      "Bash(gh pr merge:*)"
     ]
   }
 }

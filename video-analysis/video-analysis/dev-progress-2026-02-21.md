@@ -143,6 +143,111 @@ npm run dev
 
 ---
 
+## 新增项目: video-analysis-cleaner
+
+### 功能
+1. **MP4 → MP3 转换**: 使用 FFmpeg 提取音频
+2. **ASR 语音转文字**: 使用 faster-whisper (GPU 加速)
+
+### 项目结构
+```
+video-analysis-cleaner/
+├── requirements.txt     # 依赖
+├── config.py           # 配置（模型、设备等）
+├── converter.py        # MP4 → MP3
+├── transcriber.py      # ASR 转写
+├── api.py              # FastAPI 服务
+└── run_server.py       # 启动脚本
+```
+
+### 启动命令
+```bash
+cd video-analysis-cleaner
+pip install -r requirements.txt
+python run_server.py
+# 服务运行在 http://localhost:8001
+```
+
+### 前端页面
+- 新增 `video-analysis-web/cleaner.html`
+- 从主页右上角"数据清洗"进入
+- 选择文件夹 → 勾选处理选项 → 开始处理
+- 实时显示处理进度
+
+### 输出格式
+每个音频文件会生成：
+- `.txt` - 纯文本
+- `.srt` - 字幕文件
+- `.json` - 带时间戳的详细结果
+
+---
+
+---
+
+## 新增项目: video-analysis-maker
+
+### 功能
+1. **ASR 文本优化**: 使用 Gemini 1.5 Pro 修正听写错误
+2. **向量数据库**: 使用 ChromaDB + BGE 中文 embedding 构建
+3. **博主人格画像**: 分析说话风格，生成模拟 prompt
+
+### 项目结构
+```
+video-analysis-maker/
+├── config/
+│   ├── __init__.py
+│   └── settings.py          # 配置管理
+├── processors/
+│   ├── __init__.py
+│   ├── text_optimizer.py    # Gemini ASR 文本优化
+│   ├── embedder.py          # BGE 中文 embedding
+│   └── prompt_generator.py  # 博主人格画像生成
+├── storage/
+│   ├── __init__.py
+│   └── chroma_manager.py    # ChromaDB 向量数据库
+├── output/                   # 输出目录
+├── .env                      # 配置文件 (已配置 Gemini API Key)
+├── .env.example
+├── requirements.txt
+└── main.py                   # 主程序入口
+```
+
+### 技术选型
+- **LLM**: Gemini 1.5 Pro (文本优化 + 人格分析)
+- **Embedding**: BAAI/bge-large-zh-v1.5 (中文向量化)
+- **Vector DB**: ChromaDB (本地轻量级)
+- **处理粒度**: 按 ASR segments 分段 + 上下文扩展
+
+### 输出物
+处理完成后，每个博主会生成：
+```
+output/{博主名}/
+├── optimized_texts/         # 优化后的文本
+│   ├── 视频标题.json        # 含分段信息
+│   └── 视频标题.txt         # 纯文本
+├── chroma_db/               # 向量数据库 (供 RAG 使用)
+├── persona.json             # 博主人格画像
+└── system_prompt.txt        # 可直接使用的系统 prompt
+```
+
+### 启动命令
+```bash
+cd video-analysis-maker
+conda activate video-analysis
+python main.py --list-bloggers        # 查看可用博主
+python main.py                         # 处理所有博主
+python main.py --blogger "小艾财经说 - 抖音"  # 处理指定博主
+```
+
+### 状态: 代码已完成，待测试
+
+### 下一步: video-analysis-soul
+- 基于 maker 生成的数据，提供 API 服务
+- 让用户可以与"博主"进行对话交互
+- 使用 RAG 检索 + 人格 prompt 实现风格模拟
+
+---
+
 ## 相关上下文
 
 - 测试用户主页有39个作品，其中38个视频，1个图文

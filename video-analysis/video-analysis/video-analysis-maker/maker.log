@@ -1,0 +1,170 @@
+2026-02-23 21:46:24,849 - __main__ - INFO - Found 2 bloggers: ['勇哥说财经 - 抖音', '小艾财经说 - 抖音']
+2026-02-23 21:46:24,850 - __main__ - INFO - ==================================================
+2026-02-23 21:46:24,850 - __main__ - INFO - Processing blogger: 小艾财经说 - 抖音
+2026-02-23 21:46:24,850 - __main__ - INFO - ==================================================
+2026-02-23 21:46:24,850 - __main__ - INFO - Step 1: Optimizing ASR texts...
+2026-02-23 21:46:24,850 - processors.text_optimizer - INFO - TextOptimizer initialized with model: gemini-1.5-pro
+2026-02-23 21:46:24,850 - processors.text_optimizer - INFO - Processing blogger: 小艾财经说 - 抖音
+2026-02-23 21:46:25,172 - processors.text_optimizer - ERROR - Error batch optimizing segments: 404 models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-02-23 21:46:25,597 - processors.text_optimizer - ERROR - Error batch optimizing segments: 404 models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-02-23 21:46:25,722 - processors.text_optimizer - ERROR - Error batch optimizing segments: 404 models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-02-23 21:46:26,145 - processors.text_optimizer - ERROR - Error batch optimizing segments: 404 models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-02-23 21:46:26,275 - processors.text_optimizer - ERROR - Error batch optimizing segments: 404 models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-02-23 21:46:26,697 - processors.text_optimizer - ERROR - Error batch optimizing segments: 404 models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-02-23 21:46:26,829 - processors.text_optimizer - ERROR - Error batch optimizing segments: 404 models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-02-23 21:46:27,246 - processors.text_optimizer - ERROR - Error batch optimizing segments: 404 models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-02-23 21:46:27,247 - processors.text_optimizer - INFO - Processed 8 videos for 小艾财经说 - 抖音
+2026-02-23 21:46:27,252 - processors.text_optimizer - INFO - Saved 8 optimized texts to D:\Work\mahoupao\video-analysis\video-analysis\video-analysis-maker\output\小艾财经说 - 抖音\optimized_texts
+2026-02-23 21:46:27,252 - __main__ - INFO - Optimized 8 videos
+2026-02-23 21:46:27,252 - __main__ - INFO - Step 2: Building vector database...
+2026-02-23 21:46:27,429 - __main__ - ERROR - Error building vector database: Validation error: name: Expected a name containing 3-512 characters from [a-zA-Z0-9._-], starting and ending with a character in [a-zA-Z0-9]. Got: 小艾财经说_抖音
+2026-02-23 21:46:27,429 - __main__ - INFO - Step 3: Generating blogger persona...
+2026-02-23 21:46:27,429 - processors.prompt_generator - INFO - PromptGenerator initialized with model: gemini-1.5-pro
+2026-02-23 21:46:28,119 - processors.prompt_generator - ERROR - Error analyzing blogger 小艾财经说 - 抖音: 404 models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+2026-02-23 21:46:28,119 - __main__ - WARNING - Failed to generate persona
+2026-02-23 21:46:28,119 - __main__ - INFO - Completed processing: 小艾财经说 - 抖音
+2026-02-23 21:46:28,119 - __main__ - INFO - ==================================================
+2026-02-23 21:46:28,119 - __main__ - INFO - Completed: 1/1 bloggers processed successfully
+2026-02-23 21:46:28,119 - __main__ - INFO - ==================================================
+2026-02-23 21:49:18,140 - __main__ - INFO - Found 2 bloggers: ['勇哥说财经 - 抖音', '小艾财经说 - 抖音']
+2026-02-23 21:49:18,140 - __main__ - INFO - ==================================================
+2026-02-23 21:49:18,140 - __main__ - INFO - Processing blogger: 小艾财经说 - 抖音
+2026-02-23 21:49:18,140 - __main__ - INFO - ==================================================
+2026-02-23 21:49:18,141 - __main__ - INFO - Step 1: Optimizing ASR texts...
+2026-02-23 21:49:18,141 - processors.text_optimizer - INFO - TextOptimizer initialized with model: gemini-2.0-flash
+2026-02-23 21:49:18,141 - processors.text_optimizer - INFO - Processing blogger: 小艾财经说 - 抖音
+2026-02-23 21:49:18,810 - processors.text_optimizer - ERROR - Error batch optimizing segments: 404 This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a newer model for the latest features and improvements.
+2026-02-23 21:49:19,062 - processors.text_optimizer - ERROR - Error batch optimizing segments: 404 This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a newer model for the latest features and improvements.
+2026-02-23 21:49:19,564 - processors.text_optimizer - ERROR - Error batch optimizing segments: 404 This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a newer model for the latest features and improvements.
+2026-02-23 21:49:19,924 - processors.text_optimizer - ERROR - Error batch optimizing segments: 404 This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a newer model for the latest features and improvements.
+2026-02-23 21:49:20,303 - processors.text_optimizer - ERROR - Error batch optimizing segments: 404 This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a newer model for the latest features and improvements.
+2026-02-23 21:49:20,690 - processors.text_optimizer - ERROR - Error batch optimizing segments: 404 This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a newer model for the latest features and improvements.
+2026-02-23 21:49:21,062 - processors.text_optimizer - ERROR - Error batch optimizing segments: 404 This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a newer model for the latest features and improvements.
+2026-02-23 21:49:21,430 - processors.text_optimizer - ERROR - Error batch optimizing segments: 404 This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a newer model for the latest features and improvements.
+2026-02-23 21:49:21,430 - processors.text_optimizer - INFO - Processed 8 videos for 小艾财经说 - 抖音
+2026-02-23 21:49:21,444 - processors.text_optimizer - INFO - Saved 8 optimized texts to D:\Work\mahoupao\video-analysis\video-analysis\video-analysis-maker\output\小艾财经说 - 抖音\optimized_texts
+2026-02-23 21:49:21,444 - __main__ - INFO - Optimized 8 videos
+2026-02-23 21:49:21,444 - __main__ - INFO - Step 2: Building vector database...
+2026-02-23 21:49:21,572 - processors.embedder - INFO - Using device: cuda
+2026-02-23 21:49:21,572 - processors.embedder - INFO - Loading embedding model: BAAI/bge-large-zh-v1.5
+2026-02-23 21:49:21,573 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: BAAI/bge-large-zh-v1.5
+2026-02-23 21:49:21,867 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:49:21,889 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/modules.json "HTTP/1.1 200 OK"
+2026-02-23 21:49:22,130 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/modules.json "HTTP/1.1 200 OK"
+2026-02-23 21:49:22,408 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:49:22,431 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-02-23 21:49:22,458 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-02-23 21:49:22,702 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:49:22,702 - huggingface_hub.utils._http - WARNING - Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-02-23 21:49:22,721 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-02-23 21:49:22,962 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/README.md "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:49:22,980 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/README.md "HTTP/1.1 200 OK"
+2026-02-23 21:49:23,013 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/README.md "HTTP/1.1 200 OK"
+2026-02-23 21:49:23,288 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:49:23,308 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/modules.json "HTTP/1.1 200 OK"
+2026-02-23 21:49:23,561 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/sentence_bert_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:49:23,579 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/sentence_bert_config.json "HTTP/1.1 200 OK"
+2026-02-23 21:49:23,816 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/sentence_bert_config.json "HTTP/1.1 200 OK"
+2026-02-23 21:49:24,066 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/adapter_config.json "HTTP/1.1 404 Not Found"
+2026-02-23 21:49:24,322 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:49:24,341 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/config.json "HTTP/1.1 200 OK"
+2026-02-23 21:49:24,581 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/config.json "HTTP/1.1 200 OK"
+2026-02-23 21:49:24,881 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/model.safetensors "HTTP/1.1 404 Not Found"
+2026-02-23 21:49:25,146 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/model.safetensors.index.json "HTTP/1.1 404 Not Found"
+2026-02-23 21:49:25,410 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/pytorch_model.bin "HTTP/1.1 302 Found"
+2026-02-23 21:49:25,674 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-large-zh-v1.5/xet-read-token/79e7739b6ab944e86d6171e44d24c997fc1e0116 "HTTP/1.1 200 OK"
+2026-02-23 21:49:39,010 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/model.safetensors "HTTP/1.1 404 Not Found"
+2026-02-23 21:49:39,050 - __main__ - ERROR - Error building vector database: Due to a serious vulnerability issue in `torch.load`, even with `weights_only=True`, we now require users to upgrade torch to at least v2.6 in order to use the function. This version restriction does not apply when loading files with safetensors.
+See the vulnerability report here https://nvd.nist.gov/vuln/detail/CVE-2025-32434
+2026-02-23 21:49:39,051 - __main__ - INFO - Step 3: Generating blogger persona...
+2026-02-23 21:49:39,051 - processors.prompt_generator - INFO - PromptGenerator initialized with model: gemini-2.0-flash
+2026-02-23 21:49:39,261 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-large-zh-v1.5 "HTTP/1.1 200 OK"
+2026-02-23 21:49:39,524 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-large-zh-v1.5/commits/main "HTTP/1.1 200 OK"
+2026-02-23 21:49:39,591 - processors.prompt_generator - ERROR - Error analyzing blogger 小艾财经说 - 抖音: 404 This model models/gemini-2.0-flash is no longer available to new users. Please update your code to use a newer model for the latest features and improvements.
+2026-02-23 21:49:39,591 - __main__ - WARNING - Failed to generate persona
+2026-02-23 21:49:39,591 - __main__ - INFO - Completed processing: 小艾财经说 - 抖音
+2026-02-23 21:49:39,591 - __main__ - INFO - ==================================================
+2026-02-23 21:49:39,591 - __main__ - INFO - Completed: 1/1 bloggers processed successfully
+2026-02-23 21:49:39,591 - __main__ - INFO - ==================================================
+2026-02-23 21:49:39,790 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-large-zh-v1.5/discussions?p=0 "HTTP/1.1 200 OK"
+2026-02-23 21:49:40,070 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-large-zh-v1.5/commits/refs%2Fpr%2F35 "HTTP/1.1 200 OK"
+2026-02-23 21:49:40,311 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/refs%2Fpr%2F35/model.safetensors.index.json "HTTP/1.1 404 Not Found"
+2026-02-23 21:49:40,568 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/refs%2Fpr%2F35/model.safetensors "HTTP/1.1 302 Found"
+2026-02-23 21:49:40,810 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-large-zh-v1.5/xet-read-token/0cc67d9f159c4037e86efde28c42dadf6e3de7aa "HTTP/1.1 200 OK"
+2026-02-23 21:55:43,834 - __main__ - INFO - Found 2 bloggers: ['勇哥说财经 - 抖音', '小艾财经说 - 抖音']
+2026-02-23 21:55:43,834 - __main__ - INFO - ==================================================
+2026-02-23 21:55:43,834 - __main__ - INFO - Processing blogger: 小艾财经说 - 抖音
+2026-02-23 21:55:43,834 - __main__ - INFO - ==================================================
+2026-02-23 21:55:43,834 - __main__ - INFO - Step 1: Optimizing ASR texts...
+2026-02-23 21:55:43,834 - processors.text_optimizer - INFO - TextOptimizer initialized with model: gemini-2.5-flash
+2026-02-23 21:55:43,834 - processors.text_optimizer - INFO - Processing blogger: 小艾财经说 - 抖音
+2026-02-23 21:57:31,210 - processors.text_optimizer - INFO - Processed 8 videos for 小艾财经说 - 抖音
+2026-02-23 21:57:31,225 - processors.text_optimizer - INFO - Saved 8 optimized texts to D:\Work\mahoupao\video-analysis\video-analysis\video-analysis-maker\output\小艾财经说 - 抖音\optimized_texts
+2026-02-23 21:57:31,225 - __main__ - INFO - Optimized 8 videos
+2026-02-23 21:57:31,225 - __main__ - INFO - Step 2: Building vector database...
+2026-02-23 21:57:31,342 - processors.embedder - INFO - Using device: cuda
+2026-02-23 21:57:31,342 - processors.embedder - INFO - Loading embedding model: BAAI/bge-large-zh-v1.5
+2026-02-23 21:57:31,343 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: BAAI/bge-large-zh-v1.5
+2026-02-23 21:57:31,646 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:57:31,673 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/modules.json "HTTP/1.1 200 OK"
+2026-02-23 21:57:31,922 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:57:31,942 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-02-23 21:57:32,186 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/config_sentence_transformers.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:57:32,216 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/config_sentence_transformers.json "HTTP/1.1 200 OK"
+2026-02-23 21:57:32,464 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/README.md "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:57:32,497 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/README.md "HTTP/1.1 200 OK"
+2026-02-23 21:57:32,746 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/modules.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:57:32,770 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/modules.json "HTTP/1.1 200 OK"
+2026-02-23 21:57:33,014 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/sentence_bert_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:57:33,036 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/sentence_bert_config.json "HTTP/1.1 200 OK"
+2026-02-23 21:57:33,278 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/adapter_config.json "HTTP/1.1 404 Not Found"
+2026-02-23 21:57:33,520 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:57:33,541 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/config.json "HTTP/1.1 200 OK"
+2026-02-23 21:57:33,809 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/model.safetensors "HTTP/1.1 404 Not Found"
+2026-02-23 21:57:34,064 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-large-zh-v1.5 "HTTP/1.1 200 OK"
+2026-02-23 21:57:34,222 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:57:34,244 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/config.json "HTTP/1.1 200 OK"
+2026-02-23 21:57:34,329 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-large-zh-v1.5/commits/main "HTTP/1.1 200 OK"
+2026-02-23 21:57:34,501 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:57:34,524 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-02-23 21:57:34,549 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/tokenizer_config.json "HTTP/1.1 200 OK"
+2026-02-23 21:57:34,611 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-large-zh-v1.5/discussions?p=0 "HTTP/1.1 200 OK"
+2026-02-23 21:57:34,813 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-large-zh-v1.5/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+2026-02-23 21:57:34,896 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-large-zh-v1.5/commits/refs%2Fpr%2F35 "HTTP/1.1 200 OK"
+2026-02-23 21:57:35,065 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-large-zh-v1.5/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-02-23 21:57:35,139 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/refs%2Fpr%2F35/model.safetensors.index.json "HTTP/1.1 404 Not Found"
+2026-02-23 21:57:35,316 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/vocab.txt "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:57:35,342 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/vocab.txt "HTTP/1.1 200 OK"
+2026-02-23 21:57:35,371 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/vocab.txt "HTTP/1.1 200 OK"
+2026-02-23 21:57:35,385 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/refs%2Fpr%2F35/model.safetensors "HTTP/1.1 302 Found"
+2026-02-23 21:57:35,638 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/tokenizer.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:57:35,662 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/tokenizer.json "HTTP/1.1 200 OK"
+2026-02-23 21:57:35,900 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/tokenizer.json "HTTP/1.1 200 OK"
+2026-02-23 21:57:36,188 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/added_tokens.json "HTTP/1.1 404 Not Found"
+2026-02-23 21:57:36,445 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/special_tokens_map.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:57:36,681 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/special_tokens_map.json "HTTP/1.1 200 OK"
+2026-02-23 21:57:36,947 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/special_tokens_map.json "HTTP/1.1 200 OK"
+2026-02-23 21:57:37,201 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/chat_template.jinja "HTTP/1.1 404 Not Found"
+2026-02-23 21:57:37,496 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/BAAI/bge-large-zh-v1.5/resolve/main/1_Pooling/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-02-23 21:57:37,497 - huggingface_hub.utils._http - WARNING - Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-02-23 21:57:37,520 - httpx - INFO - HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/1_Pooling%2Fconfig.json "HTTP/1.1 200 OK"
+2026-02-23 21:57:37,556 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/resolve-cache/models/BAAI/bge-large-zh-v1.5/79e7739b6ab944e86d6171e44d24c997fc1e0116/1_Pooling%2Fconfig.json "HTTP/1.1 200 OK"
+2026-02-23 21:57:37,814 - httpx - INFO - HTTP Request: GET https://huggingface.co/api/models/BAAI/bge-large-zh-v1.5 "HTTP/1.1 200 OK"
+2026-02-23 21:57:38,362 - processors.embedder - INFO - Embedding model loaded successfully
+2026-02-23 21:57:38,362 - storage.chroma_manager - INFO - ChromaManager initialized for 小艾财经说 - 抖音, collection: b-0_85484d44
+2026-02-23 21:57:38,362 - storage.chroma_manager - INFO - Generating embeddings for 180 segments...
+2026-02-23 21:57:38,640 - storage.chroma_manager - INFO - Adding 180 documents to ChromaDB...
+2026-02-23 21:57:38,725 - storage.chroma_manager - INFO - Successfully added 180 documents to collection b-0_85484d44
+2026-02-23 21:57:38,733 - __main__ - INFO - Vector DB stats: {'collection_name': 'b-0_85484d44', 'blogger_name': '小艾财经说 - 抖音', 'document_count': 180, 'persist_dir': 'D:\\Work\\mahoupao\\video-analysis\\video-analysis\\video-analysis-maker\\output\\小艾财经说 - 抖音\\chroma_db'}
+2026-02-23 21:57:38,733 - __main__ - INFO - Step 3: Generating blogger persona...
+2026-02-23 21:57:38,733 - processors.prompt_generator - INFO - PromptGenerator initialized with model: gemini-2.5-flash
+2026-02-23 21:57:55,159 - processors.prompt_generator - INFO - Successfully analyzed blogger: 小艾财经说 - 抖音
+2026-02-23 21:58:07,136 - processors.prompt_generator - INFO - Successfully generated persona prompt for: 小艾财经说 - 抖音
+2026-02-23 21:58:07,137 - processors.prompt_generator - INFO - Saved persona for 小艾财经说 - 抖音 to D:\Work\mahoupao\video-analysis\video-analysis\video-analysis-maker\output\小艾财经说 - 抖音
+2026-02-23 21:58:07,137 - __main__ - INFO - Persona generated for 小艾财经说 - 抖音
+2026-02-23 21:58:07,137 - __main__ - INFO - Speaking style: 直接犀利，富有洞察力，善于提出颠覆性观点和警示，同时提供务实的解决方案。语言精炼，逻辑清晰，常以强烈的陈述句和反问句引导思考。
+2026-02-23 21:58:07,147 - __main__ - INFO - Topics: ['人工智能（AI）的最新发展及其对全球经济、社会和个人职业的影响', '职场转型与技能升级策略', '宏观经济趋势与个人资产配置/避险', '金融科技与银行业变革', '科技伦理与AI潜在风险']
+2026-02-23 21:58:07,147 - __main__ - INFO - Completed processing: 小艾财经说 - 抖音
+2026-02-23 21:58:07,147 - __main__ - INFO - ==================================================
+2026-02-23 21:58:07,147 - __main__ - INFO - Completed: 1/1 bloggers processed successfully
+2026-02-23 21:58:07,147 - __main__ - INFO - ==================================================

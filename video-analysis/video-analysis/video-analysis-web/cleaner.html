@@ -330,6 +330,36 @@
         font-size: 0.85rem;
         margin-bottom: 1rem;
       }
+
+      .path-info {
+        margin-top: 1rem;
+        padding: 0.75rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+        font-size: 0.8rem;
+      }
+
+      .path-item {
+        display: flex;
+        margin-bottom: 0.5rem;
+      }
+
+      .path-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .path-label {
+        color: var(--text-muted);
+        min-width: 100px;
+        flex-shrink: 0;
+      }
+
+      .path-value {
+        color: var(--text-color);
+        font-family: monospace;
+        word-break: break-all;
+        opacity: 0.8;
+      }
     </style>
   </head>
   <body>
@@ -341,6 +371,8 @@
             <span class="status-dot" :class="serviceOnline ? 'online' : 'offline'"></span>
             {{ serviceOnline ? '服务在线' : '服务离线' }}
           </span>
+          <a href="voice.html" class="nav-link">声音克隆</a>
+          <a href="maker.html" class="nav-link">AI训练</a>
           <a href="index.html" class="nav-link">返回下载</a>
         </div>
       </div>
@@ -426,6 +458,18 @@
               <div class="progress-bar secondary" :style="{ width: modelDownloadPercent + '%' }"></div>
             </div>
             <div class="progress-text">{{ modelDownloadMessage }}</div>
+          </div>
+
+          <!-- 路径信息 -->
+          <div class="path-info">
+            <div class="path-item">
+              <span class="path-label">下载目录:</span>
+              <span class="path-value">{{ paths.downloads_dir }}</span>
+            </div>
+            <div class="path-item">
+              <span class="path-label">模型目录:</span>
+              <span class="path-value">{{ paths.models_dir }}</span>
+            </div>
           </div>
         </div>
 
@@ -580,6 +624,7 @@
             gpuInfo: { available: false, name: null, error: null },
             currentDevice: 'cpu',
             switchingDevice: false,
+            paths: { downloads_dir: '', models_dir: '' },
 
             folders: [],
             selectedFolder: null,
@@ -616,6 +661,7 @@
                   error: data.gpu.error,
                 };
                 vm.currentDevice = data.device;
+                vm.paths = data.paths || { downloads_dir: '', models_dir: '' };
                 vm.loadFolders();
               })
               .catch(function() {
