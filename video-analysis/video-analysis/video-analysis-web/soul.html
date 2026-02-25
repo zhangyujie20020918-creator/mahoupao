@@ -267,6 +267,25 @@
         border-bottom-left-radius: 4px;
       }
 
+      .message-audio {
+        margin-top: 0.5rem;
+        width: 100%;
+        max-width: 300px;
+        height: 36px;
+        border-radius: 18px;
+        opacity: 0.9;
+      }
+
+      /* Grouped assistant messages: reduce gap */
+      .message-assistant.message-grouped {
+        margin-top: -0.6rem;
+      }
+
+      .message-avatar-placeholder {
+        width: 36px;
+        flex-shrink: 0;
+      }
+
       .message-time {
         font-size: 0.7rem;
         color: var(--text-muted);
@@ -707,15 +726,25 @@
               v-for="msg in messages"
               :key="msg.id"
               class="message"
-              :class="'message-' + msg.role"
-              v-show="msg.content || !msg.isStreaming"
+              :class="['message-' + msg.role, { 'message-grouped': msg.role === 'assistant' && !msg.isFirstInGroup }]"
+              v-show="msg.content || msg.isStreaming"
             >
-              <div class="message-avatar">{{ msg.role === 'user' ? userName.charAt(0) : currentSoul.charAt(0) }}</div>
+              <!-- Avatar: show for user or first-in-group assistant; placeholder otherwise -->
+              <div v-if="msg.role === 'user' || msg.isFirstInGroup" class="message-avatar">
+                {{ msg.role === 'user' ? userName.charAt(0) : currentSoul.charAt(0) }}
+              </div>
+              <div v-else class="message-avatar-placeholder"></div>
               <div class="message-body">
-                <div class="message-sender">{{ msg.role === 'user' ? userName : currentSoul }}</div>
+                <div v-if="msg.role === 'user' || msg.isFirstInGroup" class="message-sender">
+                  {{ msg.role === 'user' ? userName : currentSoul }}
+                </div>
                 <div class="message-bubble">{{ msg.content }}</div>
-                <div class="message-time">{{ formatTime(msg.timestamp) }}</div>
-                <!-- Sources -->
+                <audio v-if="msg.audioSrc" controls :src="msg.audioSrc"
+                  class="message-audio"></audio>
+                <div v-if="msg.role === 'user' || msg.isFirstInGroup" class="message-time">
+                  {{ formatTime(msg.timestamp) }}
+                </div>
+                <!-- Sources: only on first bubble in group -->
                 <div v-if="msg.sources && msg.sources.length > 0" class="message-sources">
                   <button class="sources-toggle" @click="toggleSources(msg.id)">
                     {{ showSources[msg.id] ? '收起参考来源' : '查看参考来源 (' + msg.sources.length + ')' }}
@@ -800,6 +829,8 @@
 
             serviceOnline: false,
             msgIdCounter: 0,
+            groupIdCounter: 0,
+            currentGroupId: null,
           };
         },
         mounted: function() {
@@ -983,7 +1014,11 @@
                       content: m.content || '',
                       timestamp: m.timestamp || null,
                       sources: m.sources || [],
+                      audioSrc: null,
                       isStreaming: false,
+                      groupId: null,
+                      sentenceId: null,
+                      isFirstInGroup: true,
                     };
                   });
                   vm.scrollToBottom();
@@ -999,27 +1034,23 @@
 
             // Append user message
             vm.msgIdCounter++;
-            var userMsgId = vm.msgIdCounter;
             vm.messages.push({
-              id: userMsgId,
+              id: vm.msgIdCounter,
               role: 'user',
               content: text,
               timestamp: new Date().toISOString(),
               sources: [],
+              audioSrc: null,
               isStreaming: false,
+              groupId: null,
+              sentenceId: null,
+              isFirstInGroup: true,
             });
 
-            // Append empty assistant message
-            vm.msgIdCounter++;
-            var assistantMsgId = vm.msgIdCounter;
-            vm.messages.push({
-              id: assistantMsgId,
-              role: 'assistant',
-              content: '',
-              timestamp: new Date().toISOString(),
-              sources: [],
-              isStreaming: true,
-            });
+            // Create a group ID for assistant response bubbles
+            vm.groupIdCounter++;
+            var groupId = vm.groupIdCounter;
+            vm.currentGroupId = groupId;
 
             vm.inputText = '';
             vm.isSending = true;
@@ -1044,13 +1075,13 @@
               var reader = response.body.getReader();
               var decoder = new TextDecoder();
               var buffer = '';
+              var currentEvent = '';
 
               function processLines(text) {
                 buffer += text;
                 var lines = buffer.split('\n');
                 buffer = lines.pop() || '';
 
-                var currentEvent = '';
                 for (var i = 0; i < lines.length; i++) {
                   var line = lines[i].trim();
                   if (line.startsWith('event:')) {
@@ -1059,8 +1090,10 @@
                     var dataStr = line.substring(5).trim();
                     try {
                       var data = JSON.parse(dataStr);
-                      vm.handleSSEEvent(currentEvent, data, assistantMsgId);
-                    } catch (e) {}
+                      vm.handleSSEEvent(currentEvent, data, groupId);
+                    } catch (e) {
+                      console.error('[SSE] JSON parse failed for event:', currentEvent, 'error:', e.message, 'data length:', dataStr.length);
+                    }
                   }
                 }
               }
@@ -1068,15 +1101,15 @@
               function read() {
                 reader.read().then(function(result) {
                   if (result.done) {
-                    // Process remaining buffer
                     if (buffer.trim()) {
                       processLines('\n');
                     }
                     vm.isSending = false;
                     vm.isThinking = false;
-                    // Mark streaming done
-                    var msg = vm.findMessage(assistantMsgId);
-                    if (msg) msg.isStreaming = false;
+                    // Mark all group messages done
+                    vm.messages.forEach(function(m) {
+                      if (m.groupId === groupId) m.isStreaming = false;
+                    });
                     return;
                   }
                   processLines(decoder.decode(result.value, { stream: true }));
@@ -1084,29 +1117,34 @@
                 }).catch(function() {
                   vm.isSending = false;
                   vm.isThinking = false;
-                  var msg = vm.findMessage(assistantMsgId);
-                  if (msg) {
-                    msg.isStreaming = false;
-                    if (!msg.content) msg.content = '连接中断，请重试';
-                  }
+                  vm.messages.forEach(function(m) {
+                    if (m.groupId === groupId) m.isStreaming = false;
+                  });
                 });
               }
               read();
             }).catch(function(e) {
               vm.isSending = false;
               vm.isThinking = false;
-              var msg = vm.findMessage(assistantMsgId);
-              if (msg) {
-                msg.isStreaming = false;
-                msg.content = '发送失败: ' + (e.message || '网络错误');
-              }
+              // Push error as a message bubble
+              vm.msgIdCounter++;
+              vm.messages.push({
+                id: vm.msgIdCounter,
+                role: 'assistant',
+                content: '发送失败: ' + (e.message || '网络错误'),
+                timestamp: new Date().toISOString(),
+                sources: [],
+                audioSrc: null,
+                isStreaming: false,
+                groupId: groupId,
+                sentenceId: 0,
+                isFirstInGroup: true,
+              });
             });
           },
 
-          handleSSEEvent: function(event, data, msgId) {
+          handleSSEEvent: function(event, data, groupId) {
             var vm = this;
-            var msg = vm.findMessage(msgId);
-            if (!msg) return;
 
             if (event === 'thinking') {
               vm.isThinking = true;
@@ -1114,27 +1152,129 @@
             } else if (event === 'searching') {
               vm.isThinking = true;
               vm.thinkingText = data.message || '正在检索...';
+            } else if (event === 'message_start') {
+              vm.isThinking = false;
+              var sid = data.sentence_id != null ? data.sentence_id : 0;
+              var isFirst = !vm.messages.some(function(m) { return m.groupId === groupId; });
+              vm.msgIdCounter++;
+              vm.messages.push({
+                id: vm.msgIdCounter,
+                role: 'assistant',
+                content: '',
+                timestamp: new Date().toISOString(),
+                sources: [],
+                audioSrc: null,
+                isStreaming: true,
+                groupId: groupId,
+                sentenceId: sid,
+                isFirstInGroup: isFirst,
+              });
+              vm.scrollToBottom();
             } else if (event === 'token') {
               vm.isThinking = false;
+              var sid = data.sentence_id != null ? data.sentence_id : 0;
+              var msg = vm.findSentenceMessage(groupId, sid);
+              if (!msg) {
+                // Fallback: create bubble if message_start was missed
+                var isFirst = !vm.messages.some(function(m) { return m.groupId === groupId; });
+                vm.msgIdCounter++;
+                vm.messages.push({
+                  id: vm.msgIdCounter,
+                  role: 'assistant',
+                  content: '',
+                  timestamp: new Date().toISOString(),
+                  sources: [],
+                  audioSrc: null,
+                  isStreaming: true,
+                  groupId: groupId,
+                  sentenceId: sid,
+                  isFirstInGroup: isFirst,
+                });
+                msg = vm.messages[vm.messages.length - 1];
+              }
               msg.content += (data.content || data.token || '');
               vm.scrollToBottom();
+            } else if (event === 'sentence_end') {
+              var sid = data.sentence_id != null ? data.sentence_id : 0;
+              var msg = vm.findSentenceMessage(groupId, sid);
+              if (msg) {
+                msg.isStreaming = false;
+              }
+            } else if (event === 'audio') {
+              var sid = data.sentence_id != null ? data.sentence_id : 0;
+              console.log('[SSE] audio event: sentence_id=' + sid + ', base64_len=' + (data.audio_base64 ? data.audio_base64.length : 0));
+              var msg = vm.findSentenceMessage(groupId, sid);
+              if (!msg) {
+                console.warn('[SSE] audio: no message found for groupId=' + groupId + ', sentenceId=' + sid);
+              }
+              if (msg && data.audio_base64) {
+                var fmt = data.format || 'wav';
+                // 用 Blob URL 代替 data URI，避免浏览器大小限制
+                try {
+                  var raw = atob(data.audio_base64);
+                  var bytes = new Uint8Array(raw.length);
+                  for (var bi = 0; bi < raw.length; bi++) bytes[bi] = raw.charCodeAt(bi);
+                  var blob = new Blob([bytes], { type: 'audio/' + fmt });
+                  msg.audioSrc = URL.createObjectURL(blob);
+                  console.log('[SSE] audio: set blob URL for sentence ' + sid);
+                } catch (blobErr) {
+                  // fallback to data URI
+                  msg.audioSrc = 'data:audio/' + fmt + ';base64,' + data.audio_base64;
+                  console.warn('[SSE] audio: blob failed, using data URI', blobErr);
+                }
+                vm.scrollToBottom();
+              }
             } else if (event === 'done') {
+              console.log('[SSE] done event received');
               vm.isThinking = false;
-              msg.isStreaming = false;
+              vm.isSending = false;
+              vm.messages.forEach(function(m) {
+                if (m.groupId === groupId) m.isStreaming = false;
+              });
+              // Attach sources to the first bubble in this group
               if (data.sources && data.sources.length > 0) {
-                msg.sources = data.sources;
+                var firstMsg = vm.messages.find(function(m) { return m.groupId === groupId; });
+                if (firstMsg) firstMsg.sources = data.sources;
               }
               vm.scrollToBottom();
             } else if (event === 'error') {
               vm.isThinking = false;
-              msg.isStreaming = false;
-              msg.content = '错误: ' + (data.message || '未知错误');
+              vm.isSending = false;
+              var errMsg = vm.messages.find(function(m) { return m.groupId === groupId; });
+              if (!errMsg) {
+                vm.msgIdCounter++;
+                vm.messages.push({
+                  id: vm.msgIdCounter,
+                  role: 'assistant',
+                  content: '',
+                  timestamp: new Date().toISOString(),
+                  sources: [],
+                  audioSrc: null,
+                  isStreaming: false,
+                  groupId: groupId,
+                  sentenceId: 0,
+                  isFirstInGroup: true,
+                });
+                errMsg = vm.messages[vm.messages.length - 1];
+              }
+              errMsg.content = '错误: ' + (data.message || '未知错误');
+              errMsg.isStreaming = false;
+              vm.scrollToBottom();
             }
           },
 
           findMessage: function(id) {
             for (var i = 0; i < this.messages.length; i++) {
               if (this.messages[i].id === id) return this.messages[i];
+            }
+            return null;
+          },
+
+          findSentenceMessage: function(groupId, sentenceId) {
+            for (var i = 0; i < this.messages.length; i++) {
+              if (this.messages[i].groupId === groupId && this.messages[i].sentenceId === sentenceId) {
+                return this.messages[i];
+              }
             }
             return null;
           },

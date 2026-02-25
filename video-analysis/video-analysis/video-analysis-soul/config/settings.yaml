@@ -92,3 +92,7 @@ logging:
     - api_key
     - password
     - token
+
+#文字转语音配置
+tts:
+    enabled: true

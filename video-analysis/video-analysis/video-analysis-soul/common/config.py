@@ -123,6 +123,18 @@ class AnalysisConfig(BaseModel):
 class StreamingConfig(BaseModel):
     chunk_size: int = 10
     heartbeat_interval_ms: int = 15000
+    min_sentence_length: int = 8
+    max_bubbles: int = 4
+
+
+class TTSConfig(BaseModel):
+    enabled: bool = False
+    voice_service_url: str = "http://localhost:8003"
+    synthesize_endpoint: str = "/api/voice/synthesize"
+    timeout_seconds: float = 30.0
+    speed: float = 1.0
+    emotion: str = "neutral"
+    max_text_length: int = 500
 
 
 class UIDebugConfig(BaseModel):
@@ -166,6 +178,7 @@ class Settings(BaseModel):
     analysis: AnalysisConfig = AnalysisConfig()
     connection_agent: ConnectionAgentConfig = ConnectionAgentConfig()
     streaming: StreamingConfig = StreamingConfig()
+    tts: TTSConfig = TTSConfig()
     ui: UIConfig = UIConfig()
     logging: LoggingConfig = LoggingConfig()
 

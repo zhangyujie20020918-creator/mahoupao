@@ -23,7 +23,10 @@ async def chat(body: ChatRequest, request: Request):
     事件类型:
     - thinking: 分析中
     - searching: 检索中
-    - token: 回复内容片段
+    - message_start: 新消息气泡 (data: {sentence_id})
+    - token: 回复内容片段 (data: {content, sentence_id})
+    - sentence_end: 句子结束 (data: {sentence_id})
+    - audio: 语音合成结果 (data: {sentence_id, audio_base64, format, duration_seconds})
     - done: 完成
     - error: 错误
     """

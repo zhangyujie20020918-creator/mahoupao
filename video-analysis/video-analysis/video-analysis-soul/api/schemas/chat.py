@@ -17,5 +17,5 @@ class ChatRequest(BaseModel):
 class ChatEvent(BaseModel):
     """SSE 事件"""
 
-    event: str  # "thinking" | "searching" | "token" | "done" | "error"
+    event: str  # "thinking" | "searching" | "message_start" | "token" | "sentence_end" | "audio" | "done" | "error"
     data: Dict[str, Any] = {}

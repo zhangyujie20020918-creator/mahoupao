@@ -1,22 +1,35 @@
 {
   "user_id": "7d45464d-00e0-48ff-9b5b-f389fa23f854",
-  "last_updated": "2026-02-25T21:39:59.481700",
+  "last_updated": "2026-02-25T23:34:46.540688",
   "interests": [
+    "AI投资",
+    "财富增长",
+    "市场板块分析",
+    "AI本身",
+    "赚钱",
     "AI的形象/外貌",
-    "AI本身"
+    "投资"
   ],
-  "visit_motivation": "与AI进行情感互动或了解其形象",
-  "personality_type": " playful/flirtatious",
-  "communication_style": "直接、非正式、寻求个人化互动",
+  "visit_motivation": "寻求AI投资指导和赚钱机会",
+  "personality_type": "好奇、行动导向、务实、寻求具体指导",
+  "communication_style": "直接、提问式、寻求具体信息",
   "recent_topics": [
-    "AI的身份/形象",
-    "与AI的互动方式",
-    "AI的身份",
-    "用户与AI的关系",
-    "用户与AI的熟悉程度"
+    "AI的声音/形式",
+    "注册流程",
+    "投资策略",
+    "AI投资",
+    "市场板块分析",
+    "AI投资与财富增长",
+    "平台注册",
+    "机器人交互方式",
+    "Bot's identity",
+    "Dinner plans"
   ],
   "mood_history": [],
-  "knowledge_level": {},
+  "knowledge_level": {
+    "AI投资策略": "寻求指导",
+    "市场板块": "寻求指导"
+  },
   "collection_progress": {
     "communication_style": true,
     "recent_topics": true,

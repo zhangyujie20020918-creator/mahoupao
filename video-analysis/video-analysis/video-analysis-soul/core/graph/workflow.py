@@ -110,3 +110,61 @@ def build_workflow(deps: Dict[str, Any]) -> StateGraph:
 
     logger.info("LangGraph workflow built successfully")
     return workflow
+
+
+def build_context_workflow(deps: Dict[str, Any]) -> StateGraph:
+    """
+    构建上下文收集子图（用于流式模式）
+
+    只包含 load_context → analyze_intent → routing → search/memory/history → END。
+    不包含 generate、connection_rewrite、post_process 等后续节点。
+    """
+    def _wrap(fn):
+        async def wrapped(state):
+            return await fn(state, **deps)
+        return wrapped
+
+    workflow = StateGraph(SoulState)
+
+    # 上下文收集节点
+    workflow.add_node("load_context", _wrap(load_context))
+    workflow.add_node("analyze_intent", _wrap(analyze_message))
+    workflow.add_node("greeting", _wrap(greeting_flow))
+    workflow.add_node("search_soul", _wrap(knowledge_retrieval))
+    workflow.add_node("search_memory", _wrap(memory_retrieval))
+    workflow.add_node("load_history", _wrap(load_detail_history))
+
+    workflow.set_entry_point("load_context")
+    workflow.add_edge("load_context", "analyze_intent")
+
+    # 路由：所有 "generate" 路径改为 END
+    workflow.add_conditional_edges(
+        "analyze_intent",
+        route_after_analysis,
+        {
+            "greeting": "greeting",
+            "soul_search": "search_soul",
+            "memory_search": "search_memory",
+            "both": "search_soul",
+            "direct": END,
+        },
+    )
+
+    workflow.add_edge("greeting", END)
+
+    workflow.add_conditional_edges(
+        "search_soul",
+        route_after_soul_search,
+        {"search_memory": "search_memory", "generate": END},
+    )
+
+    workflow.add_conditional_edges(
+        "search_memory",
+        route_after_memory_search,
+        {"load_history": "load_history", "generate": END},
+    )
+
+    workflow.add_edge("load_history", END)
+
+    logger.info("Context-only workflow built successfully")
+    return workflow
