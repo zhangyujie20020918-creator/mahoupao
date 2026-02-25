@@ -9,8 +9,8 @@ def route_after_analysis(state: SoulState) -> str:
     return route_decision(state)
 
 
-def route_after_blogger_search(state: SoulState) -> str:
-    """博主搜索后的路由"""
+def route_after_soul_search(state: SoulState) -> str:
+    """搜索后的路由"""
     if state.get("needs_memory_recall"):
         return "search_memory"
     return "generate"

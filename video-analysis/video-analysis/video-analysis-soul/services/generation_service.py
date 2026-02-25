@@ -21,7 +21,7 @@ class GenerationService:
         user_message: str,
         today_messages: List[Dict],
         preview_summary: Optional[str] = None,
-        blogger_context: Optional[str] = None,
+        soul_context: Optional[str] = None,
         memory_context: Optional[str] = None,
         user_name: Optional[str] = None,
     ) -> tuple[str, str]:
@@ -50,9 +50,9 @@ class GenerationService:
                 conv_lines.append(f"{role}: {msg.get('content', '')}")
             prompt_parts.append(f"今天的对话：\n" + "\n".join(conv_lines))
 
-        # 检索到的博主知识
-        if blogger_context:
-            prompt_parts.append(f"相关视频内容：\n{blogger_context}")
+        # 检索到的知识
+        if soul_context:
+            prompt_parts.append(f"相关视频内容：\n{soul_context}")
 
         # 历史记忆
         if memory_context:
@@ -72,7 +72,7 @@ class GenerationService:
         model: Optional[str] = None,
         today_messages: Optional[List[Dict]] = None,
         preview_summary: Optional[str] = None,
-        blogger_context: Optional[str] = None,
+        soul_context: Optional[str] = None,
         memory_context: Optional[str] = None,
         user_name: Optional[str] = None,
     ) -> str:
@@ -82,7 +82,7 @@ class GenerationService:
             user_message=user_message,
             today_messages=today_messages or [],
             preview_summary=preview_summary,
-            blogger_context=blogger_context,
+            soul_context=soul_context,
             memory_context=memory_context,
             user_name=user_name,
         )
@@ -100,7 +100,7 @@ class GenerationService:
         model: Optional[str] = None,
         today_messages: Optional[List[Dict]] = None,
         preview_summary: Optional[str] = None,
-        blogger_context: Optional[str] = None,
+        soul_context: Optional[str] = None,
         memory_context: Optional[str] = None,
         user_name: Optional[str] = None,
     ) -> AsyncGenerator[str, None]:
@@ -110,7 +110,7 @@ class GenerationService:
             user_message=user_message,
             today_messages=today_messages or [],
             preview_summary=preview_summary,
-            blogger_context=blogger_context,
+            soul_context=soul_context,
             memory_context=memory_context,
             user_name=user_name,
         )

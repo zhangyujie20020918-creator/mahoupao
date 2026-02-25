@@ -17,7 +17,7 @@
 新增独立的 AI 训练页面，类似 cleaner.html 的设计风格。
 
 **功能特性：**
-- 显示所有博主及其训练状态（已训练/待训练）
+- 显示所有及其训练状态（已训练/待训练）
 - 支持选择性跳过步骤（文本优化/向量数据库/人格画像）
 - 实时显示训练进度（SSE 流式响应）
 - 训练完成后展示人格画像预览和 System Prompt
@@ -28,8 +28,8 @@
 
 **API 端点：**
 - `GET /api/maker/status` - 获取服务状态
-- `GET /api/maker/bloggers` - 列出所有博主
-- `GET /api/maker/blogger/{name}` - 获取博主详情
+- `GET /api/maker/souls` - 列出所有
+- `GET /api/maker/soul/{name}` - 获取详情
 - `POST /api/maker/train` - 开始训练（流式响应）
 
 ### 4. 更新页面导航
@@ -64,7 +64,7 @@ index.html (下载) ─┬─→ cleaner.html (数据清洗)
 | video-analysis-web | 前端界面 | 5173 | ✅ 完成 |
 | video-analysis-cleaner | 数据清洗 (MP4→MP3, ASR) | 8001 | ✅ 完成 |
 | video-analysis-maker | ASR优化 + 向量数据库 + 人格画像 | 8002 | ✅ 完成 |
-| video-analysis-soul | 博主对话 API | - | 待开发 |
+| video-analysis-soul | 对话 API | - | 待开发 |
 
 ---
 
@@ -92,15 +92,15 @@ python run_server.py          # 端口 8002
 
 ## 训练输出示例
 
-处理完成后，每个博主生成：
+处理完成后，每个生成：
 
 ```
-output/{博主名}/
+output/{名}/
 ├── optimized_texts/         # 优化后的文本
 │   ├── 视频标题.json        # 含分段信息
 │   └── 视频标题.txt         # 纯文本
 ├── chroma_db/               # 向量数据库 (供 RAG 使用)
-├── persona.json             # 博主人格画像
+├── persona.json             # 人格画像
 └── system_prompt.txt        # 可直接使用的系统 prompt
 ```
 
@@ -109,7 +109,7 @@ output/{博主名}/
 ## 下一步: video-analysis-soul
 
 基于 maker 生成的数据，提供 API 服务：
-- 让用户可以与"博主"进行对话交互
+- 让用户可以与""进行对话交互
 - 使用 RAG 检索 + 人格 prompt 实现风格模拟
 
 ---

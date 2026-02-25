@@ -1,5 +1,5 @@
 from storage.models.persona import PersonaMetadata, PersonaType
-from storage.models.user import UserProfile
+from storage.models.user import UserProfile, SecretAnswer
 from storage.models.memory import (
     Preview,
     MemoryEntry,
@@ -13,6 +13,7 @@ __all__ = [
     "PersonaMetadata",
     "PersonaType",
     "UserProfile",
+    "SecretAnswer",
     "Preview",
     "MemoryEntry",
     "MemorySummary",

@@ -79,6 +79,6 @@ cd video-analysis-maker
 python run_server.py                   # 启动 API 服务 (端口 8002)
 
 # 或者命令行处理
-python main.py --list-bloggers        # 查看可用博主
-python main.py --blogger "博主名"      # 处理指定博主
+python main.py --list-souls        # 查看可用
+python main.py --soul "名"      # 处理指定
 ```

@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 import config
 from services.data_preparer import (
-    get_blogger_source_data,
+    get_soul_source_data,
     get_dataset_info,
     prepare_dataset_stream,
 )
@@ -78,7 +78,7 @@ app.add_middleware(
 
 class PrepareRequest(BaseModel):
     """数据准备请求"""
-    blogger_name: str
+    soul_name: str
     min_duration: float = 3.0
     max_duration: float = 15.0
     enable_denoise: bool = True  # 默认启用降噪
@@ -86,7 +86,7 @@ class PrepareRequest(BaseModel):
 
 class TrainRequest(BaseModel):
     """训练请求"""
-    blogger_name: str
+    soul_name: str
     epochs_gpt: int = config.DEFAULT_EPOCHS_GPT
     epochs_sovits: int = config.DEFAULT_EPOCHS_SOVITS
     batch_size: int = config.DEFAULT_BATCH_SIZE
@@ -94,7 +94,7 @@ class TrainRequest(BaseModel):
 
 class SynthesizeRequest(BaseModel):
     """语音合成请求"""
-    blogger_name: str
+    soul_name: str
     text: str
     speed: float = 1.0
     emotion: str = None  # 情绪类型: neutral, happy, excited, serious, curious, sad, angry, gentle
@@ -151,28 +151,28 @@ async def get_status():
     }
 
 
-@app.get("/api/voice/bloggers")
-async def list_bloggers():
-    """列出所有博主及其状态"""
-    bloggers = []
+@app.get("/api/voice/souls")
+async def list_souls():
+    """列出所有及其状态"""
+    souls = []
 
-    # 从 downloads 目录获取所有博主
+    # 从 downloads 目录获取所有
     if config.DOWNLOADS_DIR.exists():
         for d in config.DOWNLOADS_DIR.iterdir():
             if d.is_dir() and not d.name.startswith("."):
-                blogger_name = d.name
+                soul_name = d.name
 
                 # 获取源数据信息
-                source_data = get_blogger_source_data(blogger_name)
+                source_data = get_soul_source_data(soul_name)
 
                 # 获取数据集信息
-                dataset = get_dataset_info(blogger_name)
+                dataset = get_dataset_info(soul_name)
 
                 # 获取模型信息
-                model = get_trained_model_info(blogger_name)
+                model = get_trained_model_info(soul_name)
 
-                bloggers.append({
-                    "name": blogger_name,
+                souls.append({
+                    "name": soul_name,
                     "source": {
                         "has_data": source_data.get("total_pairs", 0) > 0,
                         "file_pairs": source_data.get("total_pairs", 0),
@@ -189,18 +189,18 @@ async def list_bloggers():
                     },
                 })
 
-    return {"bloggers": bloggers}
+    return {"souls": souls}
 
 
-@app.get("/api/voice/blogger/{blogger_name}")
-async def get_blogger_detail(blogger_name: str):
-    """获取博主详情"""
-    source_data = get_blogger_source_data(blogger_name)
-    dataset = get_dataset_info(blogger_name)
-    model = get_trained_model_info(blogger_name)
+@app.get("/api/voice/soul/{soul_name}")
+async def get_soul_detail(soul_name: str):
+    """获取详情"""
+    source_data = get_soul_source_data(soul_name)
+    dataset = get_dataset_info(soul_name)
+    model = get_trained_model_info(soul_name)
 
     return {
-        "name": blogger_name,
+        "name": soul_name,
         "source": source_data,
         "dataset": dataset,
         "model": model,
@@ -249,7 +249,7 @@ async def prepare_dataset(request: PrepareRequest):
 
     async def generate() -> AsyncGenerator[str, None]:
         for progress in prepare_dataset_stream(
-            request.blogger_name,
+            request.soul_name,
             request.min_duration,
             request.max_duration,
             request.enable_denoise,
@@ -276,7 +276,7 @@ async def train_model(request: TrainRequest):
         )
 
     # 检查数据集
-    dataset = get_dataset_info(request.blogger_name)
+    dataset = get_dataset_info(request.soul_name)
     if not dataset.get("exists"):
         return StreamingResponse(
             iter([f"data: {json.dumps({'type': 'error', 'message': '请先准备训练数据'})}\n\n"]),
@@ -286,14 +286,14 @@ async def train_model(request: TrainRequest):
     async def generate() -> AsyncGenerator[str, None]:
         try:
             for progress in train_model_stream(
-                request.blogger_name,
+                request.soul_name,
                 request.epochs_gpt,
                 request.epochs_sovits,
                 request.batch_size,
             ):
                 yield f"data: {json.dumps(progress, ensure_ascii=False)}\n\n"
         except asyncio.CancelledError:
-            logger.info(f"训练流被取消: {request.blogger_name}")
+            logger.info(f"训练流被取消: {request.soul_name}")
         except Exception as e:
             logger.warning(f"训练流异常: {e}")
 
@@ -308,7 +308,7 @@ async def train_model(request: TrainRequest):
 async def synthesize(request: SynthesizeRequest):
     """语音合成"""
     # 检查模型
-    model = get_trained_model_info(request.blogger_name)
+    model = get_trained_model_info(request.soul_name)
     if not model.get("ready"):
         raise HTTPException(status_code=400, detail="模型未训练，请先训练模型")
 
@@ -318,7 +318,7 @@ async def synthesize(request: SynthesizeRequest):
 
     result = synthesize_voice(
         text=request.text,
-        blogger_name=request.blogger_name,
+        soul_name=request.soul_name,
         speed=request.speed,
         emotion=request.emotion,
     )
@@ -342,23 +342,23 @@ async def list_emotions():
     }
 
 
-@app.get("/api/voice/emotions/{blogger_name}/audios")
-async def list_emotion_audios(blogger_name: str):
-    """获取博主的所有参考音频及其情绪标签"""
-    audios = get_reference_audios(blogger_name)
-    stats = get_emotion_statistics(blogger_name)
+@app.get("/api/voice/emotions/{soul_name}/audios")
+async def list_emotion_audios(soul_name: str):
+    """获取的所有参考音频及其情绪标签"""
+    audios = get_reference_audios(soul_name)
+    stats = get_emotion_statistics(soul_name)
     return {
-        "blogger_name": blogger_name,
+        "soul_name": soul_name,
         "audios": audios,
         "statistics": stats,
         "emotion_types": get_emotion_types(),
     }
 
 
-@app.post("/api/voice/emotions/{blogger_name}/tag")
-async def tag_audio_emotion(blogger_name: str, request: TagEmotionRequest):
+@app.post("/api/voice/emotions/{soul_name}/tag")
+async def tag_audio_emotion(soul_name: str, request: TagEmotionRequest):
     """为音频设置情绪标签"""
-    success = tag_emotion(blogger_name, request.filename, request.emotion)
+    success = tag_emotion(soul_name, request.filename, request.emotion)
     if not success:
         raise HTTPException(status_code=400, detail="标注失败，请检查情绪类型是否有效")
     return {
@@ -367,16 +367,16 @@ async def tag_audio_emotion(blogger_name: str, request: TagEmotionRequest):
     }
 
 
-@app.get("/api/voice/audio/{blogger_name}/{filename}")
-async def get_audio_file(blogger_name: str, filename: str):
+@app.get("/api/voice/audio/{soul_name}/{filename}")
+async def get_audio_file(soul_name: str, filename: str):
     """获取参考音频文件"""
     from urllib.parse import unquote
 
     # 确保正确解码
-    blogger_name = unquote(blogger_name)
+    soul_name = unquote(soul_name)
     filename = unquote(filename)
 
-    audio_path = config.DATASETS_DIR / blogger_name / "audio" / filename
+    audio_path = config.DATASETS_DIR / soul_name / "audio" / filename
     logger.info(f"请求音频: {audio_path}, 存在: {audio_path.exists()}")
 
     if not audio_path.exists():
@@ -459,15 +459,15 @@ async def get_expression_types():
     }
 
 
-@app.get("/api/voice/expressions/{blogger_name}")
-async def get_expression_library(blogger_name: str):
-    """获取博主的表情库"""
+@app.get("/api/voice/expressions/{soul_name}")
+async def get_expression_library(soul_name: str):
+    """获取的表情库"""
     from dataclasses import asdict
-    clips = load_library(blogger_name)
-    stats = get_library_stats(blogger_name)
+    clips = load_library(soul_name)
+    stats = get_library_stats(soul_name)
 
     return {
-        "blogger_name": blogger_name,
+        "soul_name": soul_name,
         "clips": [asdict(c) for c in clips],
         "statistics": stats,
         "types": EXPRESSION_TYPES,
@@ -475,17 +475,17 @@ async def get_expression_library(blogger_name: str):
     }
 
 
-@app.post("/api/voice/expressions/{blogger_name}/extract")
-async def extract_expression(blogger_name: str, request: ExtractExpressionRequest):
+@app.post("/api/voice/expressions/{soul_name}/extract")
+async def extract_expression(soul_name: str, request: ExtractExpressionRequest):
     """从音频中提取表情片段"""
     # 构建完整路径
-    audio_path = config.DATASETS_DIR / blogger_name / "audio" / request.source_audio
+    audio_path = config.DATASETS_DIR / soul_name / "audio" / request.source_audio
 
     if not audio_path.exists():
         raise HTTPException(status_code=404, detail="音频文件不存在")
 
     clip = extract_expression_clip(
-        blogger_name=blogger_name,
+        soul_name=soul_name,
         source_audio=str(audio_path),
         start_time=request.start_time,
         end_time=request.end_time,
@@ -500,22 +500,22 @@ async def extract_expression(blogger_name: str, request: ExtractExpressionReques
     return {"success": True, "clip": asdict(clip)}
 
 
-@app.delete("/api/voice/expressions/{blogger_name}/{clip_id}")
-async def delete_expression(blogger_name: str, clip_id: str):
+@app.delete("/api/voice/expressions/{soul_name}/{clip_id}")
+async def delete_expression(soul_name: str, clip_id: str):
     """删除表情片段"""
-    success = delete_expression_clip(blogger_name, clip_id)
+    success = delete_expression_clip(soul_name, clip_id)
     if not success:
         raise HTTPException(status_code=404, detail="片段不存在")
     return {"success": True}
 
 
-@app.get("/api/voice/expressions/{blogger_name}/audio/{clip_id}")
-async def get_expression_audio(blogger_name: str, clip_id: str):
+@app.get("/api/voice/expressions/{soul_name}/audio/{clip_id}")
+async def get_expression_audio(soul_name: str, clip_id: str):
     """获取表情音频文件"""
     from urllib.parse import unquote
 
-    blogger_name = unquote(blogger_name)
-    clips = load_library(blogger_name)
+    soul_name = unquote(soul_name)
+    clips = load_library(soul_name)
     clip = next((c for c in clips if c.id == clip_id), None)
 
     if not clip:
@@ -559,29 +559,29 @@ async def detect_expressions(request: TextPreviewRequest):
     }
 
 
-@app.delete("/api/voice/dataset/{blogger_name}")
-async def delete_dataset(blogger_name: str):
-    """删除博主的准备数据"""
+@app.delete("/api/voice/dataset/{soul_name}")
+async def delete_dataset(soul_name: str):
+    """删除的准备数据"""
     import shutil
 
-    dataset_dir = config.DATASETS_DIR / blogger_name
+    dataset_dir = config.DATASETS_DIR / soul_name
 
     if not dataset_dir.exists():
         raise HTTPException(status_code=404, detail="数据集不存在")
 
     try:
         shutil.rmtree(dataset_dir)
-        return {"success": True, "message": f"已删除 {blogger_name} 的准备数据"}
+        return {"success": True, "message": f"已删除 {soul_name} 的准备数据"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
 
 
-@app.delete("/api/voice/model/{blogger_name}")
-async def delete_model(blogger_name: str):
-    """删除博主的训练模型"""
+@app.delete("/api/voice/model/{soul_name}")
+async def delete_model(soul_name: str):
+    """删除的训练模型"""
     import shutil
 
-    model_dir = config.TRAINED_DIR / blogger_name
+    model_dir = config.TRAINED_DIR / soul_name
 
     if not model_dir.exists():
         raise HTTPException(status_code=404, detail="模型不存在")
@@ -589,15 +589,15 @@ async def delete_model(blogger_name: str):
     try:
         shutil.rmtree(model_dir)
 
-        # 如果当前合成器加载的是这个博主，重置它
+        # 如果当前合成器加载的是这个，重置它
         synthesizer = get_synthesizer()
-        if synthesizer.loaded_blogger == blogger_name:
-            synthesizer.loaded_blogger = None
+        if synthesizer.loaded_soul == soul_name:
+            synthesizer.loaded_soul = None
             synthesizer.gpt_model_path = None
             synthesizer.sovits_model_path = None
             synthesizer.ref_audio_path = None
 
-        return {"success": True, "message": f"已删除 {blogger_name} 的训练模型"}
+        return {"success": True, "message": f"已删除 {soul_name} 的训练模型"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
 

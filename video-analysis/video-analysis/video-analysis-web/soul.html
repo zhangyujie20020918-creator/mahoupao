@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>智能对话 - Video Analysis</title>
+    <style>
+      :root {
+        --primary-color: #f97316;
+        --primary-hover: #ea580c;
+        --bg-color: #1a1a1a;
+        --card-bg: #242424;
+        --text-color: rgba(255, 255, 255, 0.87);
+        --text-muted: rgba(255, 255, 255, 0.6);
+        --border-color: rgba(255, 255, 255, 0.1);
+        --success-color: #10b981;
+        --error-color: #ef4444;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* ===== Top Bar ===== */
+      .topbar {
+        height: 56px;
+        background: var(--card-bg);
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 1.25rem;
+        flex-shrink: 0;
+      }
+
+      .topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .topbar-logo {
+        font-size: 1.25rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--primary-color), #fb923c);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .soul-dropdown {
+        display: none;
+        position: relative;
+      }
+
+      .soul-dropdown-btn {
+        padding: 0.4rem 0.75rem;
+        background: var(--bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-color);
+        cursor: pointer;
+        font-size: 0.85rem;
+      }
+
+      .nav-link {
+        color: var(--text-muted);
+        text-decoration: none;
+        padding: 0.4rem 0.75rem;
+        border-radius: 6px;
+        transition: all 0.2s;
+        font-size: 0.85rem;
+      }
+
+      .nav-link:hover { background: var(--bg-color); color: var(--text-color); }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+
+      .status-dot.online { background: var(--success-color); }
+      .status-dot.offline { background: var(--error-color); }
+
+      /* ===== Main Layout ===== */
+      .main-layout {
+        display: flex;
+        height: calc(100vh - 56px);
+      }
+
+      /* ===== Sidebar ===== */
+      .sidebar {
+        width: 240px;
+        background: var(--card-bg);
+        border-right: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        overflow: hidden;
+      }
+
+      .sidebar-header {
+        padding: 1rem 1rem 0.75rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .sidebar-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0 0.5rem;
+      }
+
+      .sidebar-item {
+        padding: 0.65rem 0.75rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-bottom: 2px;
+      }
+
+      .sidebar-item:hover { background: var(--bg-color); }
+
+      .sidebar-item.active {
+        background: rgba(249, 115, 22, 0.15);
+        color: var(--primary-color);
+      }
+
+      .sidebar-item-name {
+        font-weight: 500;
+        font-size: 0.9rem;
+      }
+
+      .sidebar-item-info {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+
+      .sidebar-item.active .sidebar-item-info {
+        color: rgba(249, 115, 22, 0.7);
+      }
+
+      /* ===== Chat Area ===== */
+      .chat-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .chat-empty {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-muted);
+        gap: 0.75rem;
+      }
+
+      .chat-empty-icon {
+        font-size: 3rem;
+        opacity: 0.3;
+      }
+
+      /* ===== Message Bubbles ===== */
+      .message {
+        display: flex;
+        flex-direction: column;
+        max-width: 70%;
+        animation: fadeInUp 0.3s ease;
+      }
+
+      .message-user {
+        align-self: flex-end;
+        align-items: flex-end;
+      }
+
+      .message-assistant {
+        align-self: flex-start;
+        align-items: flex-start;
+      }
+
+      .message-bubble {
+        padding: 0.75rem 1rem;
+        border-radius: 12px;
+        line-height: 1.6;
+        font-size: 0.95rem;
+        word-break: break-word;
+        white-space: pre-wrap;
+      }
+
+      .message-user .message-bubble {
+        background: var(--primary-color);
+        color: white;
+        border-bottom-right-radius: 4px;
+      }
+
+      .message-assistant .message-bubble {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-bottom-left-radius: 4px;
+      }
+
+      .message-time {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        margin-top: 4px;
+        padding: 0 4px;
+      }
+
+      .message-sources {
+        margin-top: 0.5rem;
+      }
+
+      .sources-toggle {
+        font-size: 0.8rem;
+        color: var(--primary-color);
+        cursor: pointer;
+        background: none;
+        border: none;
+        padding: 0;
+      }
+
+      .sources-toggle:hover { text-decoration: underline; }
+
+      .sources-list {
+        margin-top: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+        font-size: 0.8rem;
+      }
+
+      .source-item {
+        padding: 0.3rem 0;
+        color: var(--text-muted);
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .source-item:last-child { border-bottom: none; }
+
+      /* ===== Thinking / Typing Indicator ===== */
+      .thinking-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        border-bottom-left-radius: 4px;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        align-self: flex-start;
+        animation: fadeInUp 0.3s ease;
+      }
+
+      .typing-dots {
+        display: flex;
+        gap: 4px;
+      }
+
+      .typing-dots span {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--text-muted);
+        animation: bounce 1.4s infinite both;
+      }
+
+      .typing-dots span:nth-child(2) { animation-delay: 0.16s; }
+      .typing-dots span:nth-child(3) { animation-delay: 0.32s; }
+
+      @keyframes bounce {
+        0%, 80%, 100% { transform: translateY(0); }
+        40% { transform: translateY(-6px); }
+      }
+
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      /* ===== Input Bar ===== */
+      .input-bar {
+        padding: 1rem 1.5rem;
+        background: var(--card-bg);
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        gap: 0.75rem;
+        align-items: flex-end;
+      }
+
+      .input-wrapper {
+        flex: 1;
+        position: relative;
+      }
+
+      .input-textarea {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        background: var(--bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        color: var(--text-color);
+        font-size: 0.95rem;
+        font-family: inherit;
+        resize: none;
+        min-height: 44px;
+        max-height: 120px;
+        line-height: 1.5;
+        transition: border-color 0.2s;
+      }
+
+      .input-textarea:focus {
+        outline: none;
+        border-color: var(--primary-color);
+      }
+
+      .input-textarea::placeholder { color: var(--text-muted); }
+
+      .input-hint {
+        position: absolute;
+        right: 0.75rem;
+        bottom: -1.25rem;
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+
+      .send-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        border: none;
+        background: var(--primary-color);
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        flex-shrink: 0;
+        font-size: 1.1rem;
+      }
+
+      .send-btn:hover:not(:disabled) {
+        background: var(--primary-hover);
+      }
+
+      .send-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      /* ===== Welcome Modal ===== */
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        backdrop-filter: blur(4px);
+      }
+
+      .modal {
+        background: var(--card-bg);
+        border-radius: 16px;
+        padding: 2rem;
+        width: 90%;
+        max-width: 400px;
+        border: 1px solid var(--border-color);
+        animation: fadeInUp 0.3s ease;
+      }
+
+      .modal-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(135deg, var(--primary-color), #fb923c);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .modal-desc {
+        color: var(--text-muted);
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+      }
+
+      .modal-input {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        background: var(--bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-color);
+        font-size: 1rem;
+        margin-bottom: 1rem;
+        transition: border-color 0.2s;
+      }
+
+      .modal-input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+      }
+
+      .modal-btn {
+        width: 100%;
+        padding: 0.75rem;
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .modal-btn:hover:not(:disabled) { background: var(--primary-hover); }
+      .modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+      /* ===== Footer link ===== */
+      .dev-link {
+        text-align: center;
+        padding: 0.5rem;
+        background: var(--card-bg);
+        border-top: 1px solid var(--border-color);
+      }
+
+      .dev-link a {
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 0.7rem;
+        opacity: 0.5;
+      }
+
+      .dev-link a:hover { opacity: 1; }
+
+      /* ===== Responsive ===== */
+      @media (max-width: 768px) {
+        .sidebar { display: none; }
+        .soul-dropdown { display: block; }
+        .nav-link { display: none; }
+        .message { max-width: 85%; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Welcome Modal -->
+      <div v-if="showWelcome" class="modal-overlay">
+        <div class="modal">
+          <h2 class="modal-title">欢迎来到智能对话</h2>
+          <p class="modal-desc">在这里，你可以和 AI 分身畅聊。</p>
+          <button class="modal-btn" :disabled="creatingUser" @click="createAnonymous" style="margin-bottom: 1rem;">
+            {{ creatingUser ? '创建中...' : '直接开始' }}
+          </button>
+          <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+            <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
+            <span style="color: var(--text-muted); font-size: 0.8rem;">或输入昵称</span>
+            <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
+          </div>
+          <input
+            v-model="newUserName"
+            class="modal-input"
+            placeholder="输入你的昵称..."
+            @keydown.enter="createUser"
+          />
+          <button class="modal-btn" :disabled="!newUserName.trim() || creatingUser" @click="createUser" style="background: transparent; border: 1px solid var(--border-color); color: var(--text-color);">
+            {{ creatingUser ? '创建中...' : '用昵称开始' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Top Bar -->
+      <div class="topbar">
+        <div class="topbar-left">
+          <span class="topbar-logo">智能对话</span>
+          <span class="status-dot" :class="serviceOnline ? 'online' : 'offline'" :title="serviceOnline ? '服务在线' : '服务离线'"></span>
+        </div>
+        <div class="topbar-right">
+          <!-- Mobile soul dropdown -->
+          <div class="soul-dropdown">
+            <select class="soul-dropdown-btn" v-model="currentSoul" @change="selectSoul(currentSoul)">
+              <option value="" disabled>选择</option>
+              <option v-for="b in souls" :key="b.name" :value="b.name">{{ b.name }}</option>
+            </select>
+          </div>
+          <a href="index.html" class="nav-link">下载</a>
+          <a href="cleaner.html" class="nav-link">清洗</a>
+          <a href="maker.html" class="nav-link">训练</a>
+          <a href="voice.html" class="nav-link">声音</a>
+        </div>
+      </div>
+
+      <!-- Main Layout -->
+      <div class="main-layout">
+        <!-- Sidebar -->
+        <div class="sidebar">
+          <div class="sidebar-header">列表</div>
+          <div class="sidebar-list">
+            <div v-if="souls.length === 0" style="padding: 1rem; color: var(--text-muted); font-size: 0.85rem; text-align: center;">
+              暂无
+            </div>
+            <div
+              v-for="b in souls"
+              :key="b.name"
+              class="sidebar-item"
+              :class="{ active: currentSoul === b.name }"
+              @click="selectSoul(b.name)"
+            >
+              <div class="sidebar-item-name">{{ b.name }}</div>
+              <div class="sidebar-item-info">
+                <span v-if="b.has_knowledge_base">知识库</span>
+                <span v-if="b.has_knowledge_base && b.has_system_prompt"> &middot; </span>
+                <span v-if="b.has_system_prompt">人格</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-area">
+          <!-- Empty state -->
+          <div v-if="!currentSoul" class="chat-messages">
+            <div class="chat-empty">
+              <div class="chat-empty-icon">&#128172;</div>
+              <div style="font-size: 1.1rem; font-weight: 500;">选择一个开始对话</div>
+              <div style="font-size: 0.85rem;">从左侧列表选择，或创建新的对话</div>
+            </div>
+          </div>
+
+          <!-- Messages -->
+          <div v-else class="chat-messages" ref="chatMessages">
+            <div v-if="messages.length === 0 && !isThinking" class="chat-empty">
+              <div class="chat-empty-icon">&#128075;</div>
+              <div style="font-size: 1.1rem; font-weight: 500;">和 {{ currentSoul }} 说点什么吧</div>
+            </div>
+
+            <div
+              v-for="msg in messages"
+              :key="msg.id"
+              class="message"
+              :class="'message-' + msg.role"
+            >
+              <div class="message-bubble">{{ msg.content }}<span v-if="msg.isStreaming" class="cursor-blink">|</span></div>
+              <div class="message-time">{{ formatTime(msg.timestamp) }}</div>
+              <!-- Sources -->
+              <div v-if="msg.sources && msg.sources.length > 0" class="message-sources">
+                <button class="sources-toggle" @click="toggleSources(msg.id)">
+                  {{ showSources[msg.id] ? '收起参考来源' : '查看参考来源 (' + msg.sources.length + ')' }}
+                </button>
+                <div v-if="showSources[msg.id]" class="sources-list">
+                  <div v-for="(src, i) in msg.sources" :key="i" class="source-item">
+                    {{ src }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Thinking indicator -->
+            <div v-if="isThinking" class="thinking-indicator">
+              <div class="typing-dots">
+                <span></span><span></span><span></span>
+              </div>
+              {{ thinkingText }}
+            </div>
+          </div>
+
+          <!-- Input Bar -->
+          <div v-if="currentSoul" class="input-bar">
+            <div class="input-wrapper">
+              <textarea
+                ref="inputBox"
+                v-model="inputText"
+                class="input-textarea"
+                rows="1"
+                placeholder="输入消息..."
+                :disabled="isSending"
+                @keydown="handleKeydown"
+                @input="autoResize"
+              ></textarea>
+              <span class="input-hint">Ctrl + Enter 发送</span>
+            </div>
+            <button class="send-btn" :disabled="!inputText.trim() || isSending" @click="sendMessage">
+              &#9654;
+            </button>
+          </div>
+
+          <!-- Dev link -->
+          <div class="dev-link">
+            <a href="souldev.html">开发工具</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script>
+      var API = 'http://localhost:8004/api/soul';
+
+      var app = Vue.createApp({
+        data: function() {
+          return {
+            userId: localStorage.getItem('soul_user_id') || '',
+            userName: localStorage.getItem('soul_user_name') || '',
+            showWelcome: false,
+            newUserName: '',
+            creatingUser: false,
+
+            souls: [],
+            currentSoul: '',
+
+            messages: [],
+            inputText: '',
+            isSending: false,
+            isThinking: false,
+            thinkingText: '正在思考...',
+
+            sidebarOpen: true,
+            showSources: {},
+
+            serviceOnline: false,
+            msgIdCounter: 0,
+          };
+        },
+        mounted: function() {
+          this.checkService();
+        },
+        methods: {
+          checkService: function() {
+            var vm = this;
+            fetch(API + '/status')
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                vm.serviceOnline = true;
+                vm.loadSouls();
+                if (!vm.userId) {
+                  vm.showWelcome = true;
+                } else {
+                  // 验证本地存的用户是否还存在于后端
+                  vm.validateUser();
+                }
+              })
+              .catch(function() {
+                vm.serviceOnline = false;
+                if (!vm.userId) {
+                  vm.showWelcome = true;
+                }
+              });
+          },
+
+          validateUser: function() {
+            var vm = this;
+            fetch(API + '/users')
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                var users = (data.data && data.data.users) || [];
+                var found = users.some(function(u) { return u.id === vm.userId; });
+                if (!found) {
+                  // 用户已被删除，清除本地缓存，重新弹欢迎窗
+                  localStorage.removeItem('soul_user_id');
+                  localStorage.removeItem('soul_user_name');
+                  vm.userId = '';
+                  vm.userName = '';
+                  vm.showWelcome = true;
+                }
+              })
+              .catch(function() {});
+          },
+
+          createAnonymous: function() {
+            var vm = this;
+            if (vm.creatingUser) return;
+            vm.creatingUser = true;
+            fetch(API + '/auth/anonymous', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                vm.creatingUser = false;
+                if (data.success && data.data) {
+                  vm.userId = data.data.id;
+                  vm.userName = data.data.name;
+                  localStorage.setItem('soul_user_id', vm.userId);
+                  localStorage.setItem('soul_user_name', vm.userName);
+                  vm.showWelcome = false;
+                }
+              })
+              .catch(function() {
+                vm.creatingUser = false;
+                alert('创建失败，请检查服务是否启动');
+              });
+          },
+
+          createUser: function() {
+            var vm = this;
+            var name = vm.newUserName.trim();
+            if (!name || vm.creatingUser) return;
+
+            vm.creatingUser = true;
+            fetch(API + '/users', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: name }),
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                vm.creatingUser = false;
+                if (data.success && data.data) {
+                  vm.userId = data.data.id;
+                  vm.userName = data.data.name;
+                  localStorage.setItem('soul_user_id', vm.userId);
+                  localStorage.setItem('soul_user_name', vm.userName);
+                  vm.showWelcome = false;
+                }
+              })
+              .catch(function() {
+                vm.creatingUser = false;
+                alert('创建用户失败，请检查服务是否启动');
+              });
+          },
+
+          loadSouls: function() {
+            var vm = this;
+            fetch(API + '/souls')
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                if (data.success && data.data) {
+                  vm.souls = data.data.personas || [];
+                }
+              })
+              .catch(function() {});
+          },
+
+          selectSoul: function(name) {
+            var vm = this;
+            vm.currentSoul = name;
+            vm.messages = [];
+            vm.showSources = {};
+            if (vm.userId && name) {
+              vm.loadHistory(vm.userId, name);
+            }
+          },
+
+          loadHistory: function(userId, soulName) {
+            var vm = this;
+            fetch(API + '/history/' + encodeURIComponent(userId) + '/' + encodeURIComponent(soulName))
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                if (data.success && data.data && data.data.today) {
+                  var msgs = data.data.today.messages || [];
+                  vm.messages = msgs.map(function(m) {
+                    vm.msgIdCounter++;
+                    return {
+                      id: vm.msgIdCounter,
+                      role: m.role === 'human' ? 'user' : 'assistant',
+                      content: m.content || '',
+                      timestamp: m.timestamp || null,
+                      sources: m.sources || [],
+                      isStreaming: false,
+                    };
+                  });
+                  vm.scrollToBottom();
+                }
+              })
+              .catch(function() {});
+          },
+
+          sendMessage: function() {
+            var vm = this;
+            var text = vm.inputText.trim();
+            if (!text || vm.isSending) return;
+
+            // Append user message
+            vm.msgIdCounter++;
+            var userMsgId = vm.msgIdCounter;
+            vm.messages.push({
+              id: userMsgId,
+              role: 'user',
+              content: text,
+              timestamp: new Date().toISOString(),
+              sources: [],
+              isStreaming: false,
+            });
+
+            // Append empty assistant message
+            vm.msgIdCounter++;
+            var assistantMsgId = vm.msgIdCounter;
+            vm.messages.push({
+              id: assistantMsgId,
+              role: 'assistant',
+              content: '',
+              timestamp: new Date().toISOString(),
+              sources: [],
+              isStreaming: true,
+            });
+
+            vm.inputText = '';
+            vm.isSending = true;
+            vm.isThinking = true;
+            vm.thinkingText = '正在思考...';
+            vm.scrollToBottom();
+
+            // Reset textarea height
+            if (vm.$refs.inputBox) {
+              vm.$refs.inputBox.style.height = 'auto';
+            }
+
+            fetch(API + '/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                user_id: vm.userId,
+                soul: vm.currentSoul,
+                message: text,
+              }),
+            }).then(function(response) {
+              var reader = response.body.getReader();
+              var decoder = new TextDecoder();
+              var buffer = '';
+
+              function processLines(text) {
+                buffer += text;
+                var lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                var currentEvent = '';
+                for (var i = 0; i < lines.length; i++) {
+                  var line = lines[i].trim();
+                  if (line.startsWith('event:')) {
+                    currentEvent = line.substring(6).trim();
+                  } else if (line.startsWith('data:')) {
+                    var dataStr = line.substring(5).trim();
+                    try {
+                      var data = JSON.parse(dataStr);
+                      vm.handleSSEEvent(currentEvent, data, assistantMsgId);
+                    } catch (e) {}
+                  }
+                }
+              }
+
+              function read() {
+                reader.read().then(function(result) {
+                  if (result.done) {
+                    // Process remaining buffer
+                    if (buffer.trim()) {
+                      processLines('\n');
+                    }
+                    vm.isSending = false;
+                    vm.isThinking = false;
+                    // Mark streaming done
+                    var msg = vm.findMessage(assistantMsgId);
+                    if (msg) msg.isStreaming = false;
+                    return;
+                  }
+                  processLines(decoder.decode(result.value, { stream: true }));
+                  read();
+                }).catch(function() {
+                  vm.isSending = false;
+                  vm.isThinking = false;
+                  var msg = vm.findMessage(assistantMsgId);
+                  if (msg) {
+                    msg.isStreaming = false;
+                    if (!msg.content) msg.content = '连接中断，请重试';
+                  }
+                });
+              }
+              read();
+            }).catch(function(e) {
+              vm.isSending = false;
+              vm.isThinking = false;
+              var msg = vm.findMessage(assistantMsgId);
+              if (msg) {
+                msg.isStreaming = false;
+                msg.content = '发送失败: ' + (e.message || '网络错误');
+              }
+            });
+          },
+
+          handleSSEEvent: function(event, data, msgId) {
+            var vm = this;
+            var msg = vm.findMessage(msgId);
+            if (!msg) return;
+
+            if (event === 'thinking') {
+              vm.isThinking = true;
+              vm.thinkingText = data.message || '正在分析...';
+            } else if (event === 'searching') {
+              vm.isThinking = true;
+              vm.thinkingText = data.message || '正在检索...';
+            } else if (event === 'token') {
+              vm.isThinking = false;
+              msg.content += (data.content || data.token || '');
+              vm.scrollToBottom();
+            } else if (event === 'done') {
+              vm.isThinking = false;
+              msg.isStreaming = false;
+              if (data.sources && data.sources.length > 0) {
+                msg.sources = data.sources;
+              }
+              vm.scrollToBottom();
+            } else if (event === 'error') {
+              vm.isThinking = false;
+              msg.isStreaming = false;
+              msg.content = '错误: ' + (data.message || '未知错误');
+            }
+          },
+
+          findMessage: function(id) {
+            for (var i = 0; i < this.messages.length; i++) {
+              if (this.messages[i].id === id) return this.messages[i];
+            }
+            return null;
+          },
+
+          toggleSources: function(msgId) {
+            this.showSources[msgId] = !this.showSources[msgId];
+          },
+
+          scrollToBottom: function() {
+            var vm = this;
+            vm.$nextTick(function() {
+              var el = vm.$refs.chatMessages;
+              if (el) {
+                el.scrollTop = el.scrollHeight;
+              }
+            });
+          },
+
+          formatTime: function(ts) {
+            if (!ts) return '';
+            var d = new Date(ts);
+            var h = String(d.getHours()).padStart(2, '0');
+            var m = String(d.getMinutes()).padStart(2, '0');
+            return h + ':' + m;
+          },
+
+          handleKeydown: function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+              e.preventDefault();
+              this.sendMessage();
+            }
+          },
+
+          autoResize: function(e) {
+            var el = e.target;
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+          },
+        },
+      });
+
+      app.mount('#app');
+    </script>
+  </body>
+</html>

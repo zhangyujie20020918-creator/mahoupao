@@ -16,7 +16,7 @@ async def post_process(state: SoulState, **deps) -> dict:
     memory_manager = deps.get("memory_manager")
 
     user_id = state["user_id"]
-    blogger_name = state["blogger_name"]
+    soul_name = state["soul_name"]
 
     # 保存用户消息
     user_msg = Message(
@@ -24,7 +24,7 @@ async def post_process(state: SoulState, **deps) -> dict:
         role="user",
         content=state["user_message"],
     )
-    await memory_manager.add_message(user_id, blogger_name, user_msg)
+    await memory_manager.add_message(user_id, soul_name, user_msg)
 
     # 保存 AI 回复
     sources = [
@@ -36,10 +36,10 @@ async def post_process(state: SoulState, **deps) -> dict:
         content=state.get("response", ""),
         sources=sources,
     )
-    conv = await memory_manager.add_message(user_id, blogger_name, ai_msg)
+    conv = await memory_manager.add_message(user_id, soul_name, ai_msg)
 
     logger.info(
-        f"Saved messages: user_id={user_id}, blogger={blogger_name}, "
+        f"Saved messages: user_id={user_id}, soul={soul_name}, "
         f"total_messages={conv.message_count}"
     )
 

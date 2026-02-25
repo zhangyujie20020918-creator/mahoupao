@@ -101,6 +101,19 @@ class InfoExtractionConfig(BaseModel):
     ]
 
 
+class ConnectionAgentConfig(BaseModel):
+    """连接助手配置（匿名用户关系建立）"""
+    enabled: bool = True
+    nudge_threshold: int = 5
+    dimensions: List[str] = [
+        "interests",
+        "visit_motivation",
+        "personality_type",
+        "communication_style",
+        "recent_topics",
+    ]
+
+
 class AnalysisConfig(BaseModel):
     intent: IntentConfig = IntentConfig()
     emotion: EmotionConfig = EmotionConfig()
@@ -151,6 +164,7 @@ class Settings(BaseModel):
     cache: CacheConfig = CacheConfig()
     llm: LLMConfig = LLMConfig()
     analysis: AnalysisConfig = AnalysisConfig()
+    connection_agent: ConnectionAgentConfig = ConnectionAgentConfig()
     streaming: StreamingConfig = StreamingConfig()
     ui: UIConfig = UIConfig()
     logging: LoggingConfig = LoggingConfig()

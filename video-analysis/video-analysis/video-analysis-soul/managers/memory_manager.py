@@ -50,14 +50,14 @@ class MemoryManager:
         # 更新或添加今日记忆
         today = today_str()
         existing_entry = next(
-            (m for m in preview.memories if m.date == today and m.blogger == persona_name),
+            (m for m in preview.memories if m.date == today and m.soul == persona_name),
             None,
         )
         if existing_entry:
             existing_entry.summary = summary
         else:
             preview.memories.append(
-                MemoryEntry(date=today, blogger=persona_name, summary=summary)
+                MemoryEntry(date=today, soul=persona_name, summary=summary)
             )
 
         preview.last_updated = now()

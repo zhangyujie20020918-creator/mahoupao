@@ -22,7 +22,7 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         soul.html (前端)                             │
 ├─────────────────────────────────────────────────────────────────────┤
-│  [博主选择]  [用户选择]  [模型选择]  [+ 新用户]                        │
+│  [选择]  [用户选择]  [模型选择]  [+ 新用户]                        │
 │  ┌─────────────────────────────────────────────────────────────────┐│
 │  │                        聊天界面                                  ││
 │  │  - 流式响应                                                      ││
@@ -46,7 +46,7 @@
 │  │                    ┌──────────────────────────┼───────┐       │  │
 │  │                    ▼                          ▼       ▼       │  │
 │  │            ┌──────────────┐          ┌────────────┐ ┌─────┐   │  │
-│  │            │ Preview 检索  │          │ 博主知识检索│ │无检索│   │  │
+│  │            │ Preview 检索  │          │ 知识检索│ │无检索│   │  │
 │  │            │ (历史记忆)    │          │ (ChromaDB) │ │     │   │  │
 │  │            └──────┬───────┘          └─────┬──────┘ └──┬──┘   │  │
 │  │                   │                        │           │      │  │
@@ -97,7 +97,7 @@
 
 ```python
 class PersonaType(Enum):
-    INFLUENCER = "influencer"   # 网红/博主
+    INFLUENCER = "influencer"   # 网红/
     CELEBRITY = "celebrity"     # 明星
     EXPERT = "expert"          # 专家
     CHARACTER = "character"    # 虚拟角色
@@ -119,7 +119,7 @@ video-analysis-maker/output/{persona_name}/
 **persona.json 字段映射**：
 | Maker 字段 | Soul 字段 | 说明 |
 |-----------|----------|------|
-| blogger_name | persona_name | 人格名称 |
+| soul_name | persona_name | 人格名称 |
 | speaking_style | speaking_style | 说话风格 |
 | common_phrases | common_phrases | 常用语句 |
 | topic_expertise | topic_expertise | 专业领域 |
@@ -168,7 +168,7 @@ def _get_collection_name(persona_name: str) -> str:
     sanitized = re.sub(r'[^a-zA-Z0-9._-]', '', persona_name)
 
     if not sanitized:
-        return f"blogger_{name_hash}"
+        return f"soul_{name_hash}"
 
     if not sanitized[0].isalnum():
         sanitized = f"b{sanitized}"
@@ -191,13 +191,13 @@ soul_data/
 │   │   ├── profile.json              # 用户基本信息
 │   │   ├── preview.json              # 记忆总览（跨天累积）
 │   │   └── conversations/
-│   │       └── {blogger_name}/
+│   │       └── {soul_name}/
 │   │           ├── 2026-02-25.json   # 当天对话
 │   │           ├── 2026-02-24.json   # 历史对话
 │   │           └── ...
 │   └── index.json                    # 用户索引
 │
-└── (博主数据复用 maker 的 output/ 目录)
+└── (数据复用 maker 的 output/ 目录)
 ```
 
 #### 4.2 数据模型
@@ -221,7 +221,7 @@ soul_data/
   "memories": [
     {
       "date": "2026-02-25",
-      "blogger": "勇哥说财经",
+      "soul": "勇哥说财经",
       "summary": {
         "topics_discussed": ["AI应用板块", "商业航天"],
         "people_mentioned": [
@@ -241,7 +241,7 @@ soul_data/
     },
     {
       "date": "2026-02-24",
-      "blogger": "勇哥说财经",
+      "soul": "勇哥说财经",
       "summary": { ... }
     }
   ]
@@ -253,7 +253,7 @@ soul_data/
 {
   "date": "2026-02-25",
   "user_id": "uuid-xxx",
-  "blogger": "勇哥说财经",
+  "soul": "勇哥说财经",
   "messages": [
     {
       "id": "msg-001",
@@ -288,25 +288,25 @@ from langgraph.graph import StateGraph
 class SoulState(TypedDict):
     # 输入
     user_id: str
-    blogger_name: str
+    soul_name: str
     user_message: str
     model: str
 
     # 分析结果
     intent: Literal["greeting", "question", "recall", "chat", "farewell"]
-    needs_blogger_knowledge: bool      # 是否需要博主知识库
+    needs_soul_knowledge: bool      # 是否需要知识库
     needs_memory_recall: bool          # 是否需要回忆历史
     memory_keywords: List[str]         # 需要检索的记忆关键词
 
     # 检索结果
-    blogger_context: List[str]         # 博主知识检索结果
+    soul_context: List[str]         # 知识检索结果
     memory_context: Optional[str]      # 历史记忆检索结果
     detailed_history: Optional[str]    # 加载的详细历史
 
     # 当前上下文
     today_messages: List[dict]         # 今日对话历史
     preview_summary: dict              # Preview 总览
-    system_prompt: str                 # 博主 system prompt
+    system_prompt: str                 #  system prompt
 
     # 输出
     response: str                      # AI 回复
@@ -323,12 +323,12 @@ def analyze_intent(state: SoulState) -> SoulState:
 
     使用轻量模型 (gemini-2.0-flash-lite) 快速分析：
     - greeting: 打招呼 → 不需要检索
-    - question: 专业问题 → 需要博主知识库
+    - question: 专业问题 → 需要知识库
     - recall: 提及过去 → 需要记忆检索
     - chat: 日常闲聊 → 可能需要记忆
     - farewell: 告别 → 不需要检索
 
-    返回: intent, needs_blogger_knowledge, needs_memory_recall, memory_keywords
+    返回: intent, needs_soul_knowledge, needs_memory_recall, memory_keywords
     """
     pass
 
@@ -337,19 +337,19 @@ def route_context(state: SoulState) -> str:
     """
     根据意图决定走哪个检索分支
 
-    返回: "blogger_search" | "memory_search" | "both" | "direct"
+    返回: "soul_search" | "memory_search" | "both" | "direct"
     """
-    if state["needs_blogger_knowledge"] and state["needs_memory_recall"]:
+    if state["needs_soul_knowledge"] and state["needs_memory_recall"]:
         return "both"
-    elif state["needs_blogger_knowledge"]:
-        return "blogger_search"
+    elif state["needs_soul_knowledge"]:
+        return "soul_search"
     elif state["needs_memory_recall"]:
         return "memory_search"
     else:
         return "direct"
 
-# 节点 3a: 博主知识检索
-def search_blogger_knowledge(state: SoulState) -> SoulState:
+# 节点 3a: 知识检索
+def search_soul_knowledge(state: SoulState) -> SoulState:
     """
     从 ChromaDB 检索相关视频内容
 
@@ -384,7 +384,7 @@ def generate_response(state: SoulState) -> SoulState:
     组装最终 prompt，调用 LLM 生成回复
 
     Prompt 结构：
-    [System Prompt - 博主人格]
+    [System Prompt - 人格]
 
     [Preview Summary - 用户记忆总览]
     关于这位用户，你记得：
@@ -399,7 +399,7 @@ def generate_response(state: SoulState) -> SoulState:
 
     [Retrieved Context - 检索到的相关内容]
     相关视频内容：
-    {blogger_context}
+    {soul_context}
 
     相关历史记忆：
     {memory_context}
@@ -427,7 +427,7 @@ workflow = StateGraph(SoulState)
 
 # 添加节点
 workflow.add_node("analyze_intent", analyze_intent)
-workflow.add_node("search_blogger", search_blogger_knowledge)
+workflow.add_node("search_soul", search_soul_knowledge)
 workflow.add_node("search_memory", search_memory)
 workflow.add_node("load_history", load_detailed_history)
 workflow.add_node("generate", generate_response)
@@ -441,16 +441,16 @@ workflow.add_conditional_edges(
     "analyze_intent",
     route_context,
     {
-        "blogger_search": "search_blogger",
+        "soul_search": "search_soul",
         "memory_search": "search_memory",
-        "both": "search_blogger",  # 先搜博主，再搜记忆
+        "both": "search_soul",  # 先搜，再搜记忆
         "direct": "generate"
     }
 )
 
-# 博主搜索后的路由
+# 搜索后的路由
 workflow.add_conditional_edges(
-    "search_blogger",
+    "search_soul",
     lambda s: "search_memory" if s["needs_memory_recall"] else "generate",
     {
         "search_memory": "search_memory",
@@ -492,7 +492,7 @@ app = workflow.compile()
 #### 6.2 总结 Prompt
 
 ```
-你是一个记忆助手，负责总结用户和博主的对话。
+你是一个记忆助手，负责总结用户和的对话。
 
 请从以下对话中提取关键信息，格式如下：
 {
@@ -590,7 +590,7 @@ cache:
 | 环节 | 优化策略 | 预期延迟 |
 |------|---------|---------|
 | 意图分析 | 使用 gemini-2.0-flash-lite | ~200ms |
-| 博主知识检索 | ChromaDB 本地向量搜索 | ~50ms |
+| 知识检索 | ChromaDB 本地向量搜索 | ~50ms |
 | 记忆检索 | JSON 文件内存缓存 + 关键词匹配 | ~10ms |
 | 详细历史加载 | 按需加载，LRU 缓存 | ~20ms |
 | 生成回复 | 流式输出，首 token 快 | ~500ms |
@@ -599,8 +599,8 @@ cache:
 #### 8.2 缓存策略
 
 ```python
-# 1. 博主数据缓存 (启动时加载)
-blogger_cache = {
+# 1. 数据缓存 (启动时加载)
+soul_cache = {
     "勇哥说财经": {
         "system_prompt": "...",
         "chroma_collection": <ChromaCollection>,
@@ -613,17 +613,17 @@ preview_cache = LRUCache(maxsize=100)  # 最多缓存 100 个用户
 
 # 3. 今日对话缓存 (内存)
 today_conversations = {
-    ("user_id", "blogger"): [messages]
+    ("user_id", "soul"): [messages]
 }
 ```
 
 #### 8.3 并行处理
 
 ```python
-# 博主知识检索 和 记忆检索 可并行
+# 知识检索 和 记忆检索 可并行
 async def parallel_search(state):
     results = await asyncio.gather(
-        search_blogger_knowledge(state),
+        search_soul_knowledge(state),
         search_memory(state)
     )
     return merge_results(results)
@@ -681,11 +681,11 @@ async def parallel_search(state):
 |------|------|------|
 | GET | `/api/soul/status` | 服务状态 |
 | GET | `/api/soul/models` | 可用模型列表 |
-| GET | `/api/soul/bloggers` | 可用博主列表 |
+| GET | `/api/soul/souls` | 可用列表 |
 | GET | `/api/soul/users` | 用户列表 |
 | POST | `/api/soul/users` | 创建用户 |
 | DELETE | `/api/soul/users/{id}` | 删除用户 |
-| GET | `/api/soul/history/{user_id}/{blogger}` | 获取对话历史 |
+| GET | `/api/soul/history/{user_id}/{soul}` | 获取对话历史 |
 | POST | `/api/soul/chat` | 发送消息（SSE 流式） |
 | POST | `/api/soul/preview/refresh` | 强制刷新 Preview |
 
@@ -696,7 +696,7 @@ async def parallel_search(state):
 POST /api/soul/chat
 {
   "user_id": "uuid-xxx",
-  "blogger": "勇哥说财经",
+  "soul": "勇哥说财经",
   "message": "今天AI应用怎么看？",
   "model": "gemini-2.5-flash"
 }
@@ -737,7 +737,7 @@ data: {
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  🧠 博主灵魂对话                                           [设置]   │
+│  🧠 灵魂对话                                           [设置]   │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
@@ -1621,6 +1621,131 @@ deployment:
 | 错误恢复 | ✅ 完成 | 降级策略+日志系统+备份 |
 | 测试策略 | ✅ 完成 | 除前端外全覆盖，mock+真实 |
 | 部署配置 | ✅ 完成 | Docker+多实例+JSON日志 |
+| 连接助手 | ✅ 完成 | 匿名用户关系建立+偏好收集+注册引导 |
+| Auth 认证 | ✅ 完成 | 匿名/注册/口令/小秘密验证 |
+
+---
+
+## Connection Agent（连接助手）设计
+
+### 概述
+
+连接助手是一个针对匿名用户的关系建立系统。当匿名用户与对话时，系统会自动改写回复，融入关系建立元素，逐步收集用户画像，并在适当时机温柔引导注册。
+
+### 工作流变更
+
+```
+旧: generate/greeting → post_process → update_memory → END
+新: generate/greeting → connection_rewrite → post_process → extract_preferences → update_memory → END
+```
+
+### 新增节点
+
+#### connection_rewrite（连接改写）
+
+- **位置**：generate/greeting 之后，post_process 之前
+- **触发条件**：仅匿名用户（is_anonymous=True）
+- **逻辑**：
+  1. 从 user_preferences.collection_progress 计算还未收集的维度
+  2. 选择本轮目标维度（按顺序取第一个未收集的）
+  3. 使用 connection_agent.txt prompt 模板调用 LLM 改写回复
+  4. 保持人设和风格，自然追加探索性元素
+  5. 超过 nudge_threshold 轮后，温柔提示注册
+- **失败处理**：保留原始回复，不影响用户体验
+- **注册用户**：直接 return {}（NO-OP）
+
+#### extract_preferences（偏好提取）
+
+- **位置**：post_process 之后，update_memory 之前
+- **触发条件**：仅匿名用户，且每 3 轮提取一次（第 2 轮也提取）
+- **逻辑**：
+  1. 调用 LLM 从最近 12 条消息中提取偏好 JSON
+  2. 通过 PreferencesRepository.merge_from_conversation() 合并保存
+  3. 支持的维度：interests, visit_motivation, personality_type, communication_style, recent_topics, knowledge_level
+- **存储位置**：`soul_data/users/{user_id}/preferences.json`
+
+### 新增配置
+
+```yaml
+# config/settings.yaml
+connection_agent:
+  enabled: true           # 是否启用连接助手
+  nudge_threshold: 5      # 多少轮后开始引导注册
+  dimensions:             # 需要收集的用户画像维度
+    - interests
+    - visit_motivation
+    - personality_type
+    - communication_style
+    - recent_topics
+```
+
+### LLM 调用开销
+
+| 用户类型 | connection_rewrite | extract_preferences | 平均额外调用/轮 |
+|----------|-------------------|-------------------|----------------|
+| 匿名用户 | 每轮 1 次 | 每 3 轮 1 次 | ~1.33 |
+| 注册用户 | 0（NO-OP） | 0（NO-OP） | 0 |
+
+全部使用 analysis_model（gemini-2.5-flash），最低成本。
+
+### 新增文件
+
+```
+core/graph/nodes/connection_rewrite.py    # 连接改写节点
+core/graph/nodes/extract_preferences.py   # 偏好提取节点
+config/prompts/connection_agent.txt       # 连接助手 prompt 模板
+storage/models/preferences.py             # 用户偏好模型
+storage/repositories/preferences_repository.py  # 偏好仓库
+```
+
+### 修改文件
+
+```
+common/config.py              # 新增 ConnectionAgentConfig
+core/graph/state.py           # 新增 turn_count 字段
+core/graph/nodes/load_context.py  # 加载匿名状态和偏好
+core/graph/workflow.py        # 注册新节点，重新布线
+core/engine.py                # 注入 PreferencesRepository
+```
+
+### 数据流
+
+```
+1. load_context: 加载 is_anonymous, user_preferences, turn_count
+2. generate/greeting: 生成原始回复
+3. connection_rewrite: (匿名) 用 connection_agent prompt 改写回复
+4. post_process: 保存消息（包含改写后的回复）
+5. extract_preferences: (匿名, 每3轮) 提取偏好并保存
+6. update_memory: 更新 Preview 总结
+```
+
+---
+
+## Auth 认证系统设计
+
+### 用户身份类型
+
+| 类型 | is_anonymous | is_registered | 说明 |
+|------|-------------|--------------|------|
+| 匿名用户 | true | false | 自动创建，名称为"访客_xxxxxx" |
+| 注册用户 | false | true | 设置了名字+口令+小秘密 |
+
+### API 端点
+
+```
+POST /auth/anonymous          # 创建匿名用户
+POST /auth/register           # 完整注册（名字+性别+口令+小秘密）
+POST /auth/upgrade            # 匿名升级为注册用户
+POST /auth/verify/passphrase  # 口令验证
+GET  /auth/verify/challenge   # 获取随机小秘密挑战题
+POST /auth/verify/secret      # 验证小秘密答案
+GET  /auth/secrets/catalog    # 获取小秘密题目目录
+GET  /auth/user/{user_id}     # 获取用户信息
+```
+
+### 小秘密认证
+
+用户注册时选择并回答小秘密题目（14道题：通用6道+男性4道+女性4道），答案 SHA-256 加密存储。登录时可用「口令」或「小秘密挑战」两种方式验证。
 
 ---
 
@@ -1638,4 +1763,6 @@ deployment:
 - [x] 错误恢复与日志系统设计
 - [x] 测试策略详细设计
 - [x] 部署配置设计（Docker+多实例）
+- [x] Connection Agent 连接助手集成（工作流+节点+配置+偏好系统）
+- [x] Auth 认证系统（匿名用户+注册+口令+小秘密验证）
 

@@ -6,7 +6,7 @@ Video Analysis Maker - 主程序
 功能：
 1. 优化 ASR 转写文本（修正听写错误）
 2. 构建 ChromaDB 向量数据库
-3. 生成博主人格画像和系统 prompt
+3. 生成人格画像和系统 prompt
 """
 
 import sys
@@ -53,31 +53,31 @@ class VideoAnalysisMaker:
         if self.prompt_generator is None:
             self.prompt_generator = PromptGenerator()
 
-    def get_bloggers(self) -> List[Path]:
-        """获取所有博主目录"""
+    def get_souls(self) -> List[Path]:
+        """获取所有目录"""
         downloads_dir = self.settings.downloads_dir
         if not downloads_dir.exists():
             logger.error(f"Downloads directory not found: {downloads_dir}")
             return []
 
-        bloggers = [
+        souls = [
             d for d in downloads_dir.iterdir()
             if d.is_dir() and not d.name.startswith(".")
         ]
-        return bloggers
+        return souls
 
-    def process_blogger(
+    def process_soul(
         self,
-        blogger_dir: Path,
+        soul_dir: Path,
         skip_optimization: bool = False,
         skip_vectordb: bool = False,
         skip_persona: bool = False
     ) -> bool:
         """
-        处理单个博主
+        处理单个
 
         Args:
-            blogger_dir: 博主目录路径
+            soul_dir: 目录路径
             skip_optimization: 是否跳过文本优化
             skip_vectordb: 是否跳过向量数据库构建
             skip_persona: 是否跳过人格画像生成
@@ -85,19 +85,19 @@ class VideoAnalysisMaker:
         Returns:
             是否成功
         """
-        blogger_name = blogger_dir.name
+        soul_name = soul_dir.name
         logger.info(f"=" * 50)
-        logger.info(f"Processing blogger: {blogger_name}")
+        logger.info(f"Processing soul: {soul_name}")
         logger.info(f"=" * 50)
 
-        output_dir = self.settings.get_blogger_output_dir(blogger_name)
+        output_dir = self.settings.get_soul_output_dir(soul_name)
         optimized_videos: List[OptimizedVideo] = []
 
         # Step 1: 文本优化
         if not skip_optimization:
             logger.info("Step 1: Optimizing ASR texts...")
             self._init_optimizer()
-            optimized_videos = self.text_optimizer.process_blogger(blogger_dir)
+            optimized_videos = self.text_optimizer.process_soul(soul_dir)
 
             if optimized_videos:
                 self.text_optimizer.save_optimized_texts(optimized_videos, output_dir)
@@ -107,7 +107,7 @@ class VideoAnalysisMaker:
                 return False
         else:
             logger.info("Step 1: Skipping text optimization, loading existing...")
-            optimized_videos = self._load_optimized_videos(output_dir, blogger_name)
+            optimized_videos = self._load_optimized_videos(output_dir, soul_name)
             if not optimized_videos:
                 logger.error("No optimized videos found, cannot continue")
                 return False
@@ -116,7 +116,7 @@ class VideoAnalysisMaker:
         if not skip_vectordb:
             logger.info("Step 2: Building vector database...")
             try:
-                chroma_manager = ChromaManager(blogger_name, output_dir / "chroma_db")
+                chroma_manager = ChromaManager(soul_name, output_dir / "chroma_db")
                 chroma_manager.add_videos(optimized_videos)
                 stats = chroma_manager.get_stats()
                 logger.info(f"Vector DB stats: {stats}")
@@ -127,13 +127,13 @@ class VideoAnalysisMaker:
 
         # Step 3: 生成人格画像
         if not skip_persona:
-            logger.info("Step 3: Generating blogger persona...")
+            logger.info("Step 3: Generating soul persona...")
             self._init_prompt_generator()
-            persona = self.prompt_generator.create_blogger_persona(optimized_videos)
+            persona = self.prompt_generator.create_soul_persona(optimized_videos)
 
             if persona:
                 self.prompt_generator.save_persona(persona, output_dir)
-                logger.info(f"Persona generated for {blogger_name}")
+                logger.info(f"Persona generated for {soul_name}")
                 logger.info(f"Speaking style: {persona.speaking_style}")
                 logger.info(f"Topics: {persona.topic_expertise}")
             else:
@@ -141,10 +141,10 @@ class VideoAnalysisMaker:
         else:
             logger.info("Step 3: Skipping persona generation")
 
-        logger.info(f"Completed processing: {blogger_name}")
+        logger.info(f"Completed processing: {soul_name}")
         return True
 
-    def _load_optimized_videos(self, output_dir: Path, blogger_name: str) -> List[OptimizedVideo]:
+    def _load_optimized_videos(self, output_dir: Path, soul_name: str) -> List[OptimizedVideo]:
         """从已保存的文件加载优化后的视频"""
         import json
         from processors.text_optimizer import OptimizedVideo, OptimizedSegment
@@ -172,7 +172,7 @@ class VideoAnalysisMaker:
 
                 video = OptimizedVideo(
                     video_title=data["video_title"],
-                    blogger_name=data["blogger_name"],
+                    soul_name=data["soul_name"],
                     original_full_text=data["original_full_text"],
                     optimized_full_text=data["optimized_full_text"],
                     segments=segments
@@ -185,7 +185,7 @@ class VideoAnalysisMaker:
 
     def run(
         self,
-        blogger_name: Optional[str] = None,
+        soul_name: Optional[str] = None,
         skip_optimization: bool = False,
         skip_vectordb: bool = False,
         skip_persona: bool = False
@@ -194,56 +194,56 @@ class VideoAnalysisMaker:
         运行主处理流程
 
         Args:
-            blogger_name: 指定博主名称，None 则处理所有博主
+            soul_name: 指定名称，None 则处理所有
             skip_optimization: 是否跳过文本优化
             skip_vectordb: 是否跳过向量数据库
             skip_persona: 是否跳过人格画像
         """
-        bloggers = self.get_bloggers()
+        souls = self.get_souls()
 
-        if not bloggers:
-            logger.error("No bloggers found in downloads directory")
+        if not souls:
+            logger.error("No souls found in downloads directory")
             return
 
-        logger.info(f"Found {len(bloggers)} bloggers: {[b.name for b in bloggers]}")
+        logger.info(f"Found {len(souls)} souls: {[b.name for b in souls]}")
 
-        # 过滤指定博主
-        if blogger_name:
-            bloggers = [b for b in bloggers if b.name == blogger_name]
-            if not bloggers:
-                logger.error(f"Blogger not found: {blogger_name}")
+        # 过滤指定
+        if soul_name:
+            souls = [b for b in souls if b.name == soul_name]
+            if not souls:
+                logger.error(f"Soul not found: {soul_name}")
                 return
 
-        # 处理每个博主
+        # 处理每个
         success_count = 0
-        for blogger_dir in bloggers:
+        for soul_dir in souls:
             try:
-                if self.process_blogger(
-                    blogger_dir,
+                if self.process_soul(
+                    soul_dir,
                     skip_optimization=skip_optimization,
                     skip_vectordb=skip_vectordb,
                     skip_persona=skip_persona
                 ):
                     success_count += 1
             except Exception as e:
-                logger.error(f"Error processing {blogger_dir.name}: {e}")
+                logger.error(f"Error processing {soul_dir.name}: {e}")
                 import traceback
                 traceback.print_exc()
 
         logger.info(f"=" * 50)
-        logger.info(f"Completed: {success_count}/{len(bloggers)} bloggers processed successfully")
+        logger.info(f"Completed: {success_count}/{len(souls)} souls processed successfully")
         logger.info(f"=" * 50)
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Video Analysis Maker - 处理博主视频内容"
+        description="Video Analysis Maker - 处理视频内容"
     )
     parser.add_argument(
-        "--blogger", "-b",
+        "--soul", "-b",
         type=str,
         default=None,
-        help="指定处理的博主名称（默认处理所有博主）"
+        help="指定处理的名称（默认处理所有）"
     )
     parser.add_argument(
         "--skip-optimization",
@@ -261,24 +261,24 @@ def main():
         help="跳过人格画像生成"
     )
     parser.add_argument(
-        "--list-bloggers",
+        "--list-souls",
         action="store_true",
-        help="列出所有可用的博主"
+        help="列出所有可用的"
     )
 
     args = parser.parse_args()
 
     maker = VideoAnalysisMaker()
 
-    if args.list_bloggers:
-        bloggers = maker.get_bloggers()
-        print("\n可用的博主：")
-        for b in bloggers:
+    if args.list_souls:
+        souls = maker.get_souls()
+        print("\n可用的：")
+        for b in souls:
             print(f"  - {b.name}")
         return
 
     maker.run(
-        blogger_name=args.blogger,
+        soul_name=args.soul,
         skip_optimization=args.skip_optimization,
         skip_vectordb=args.skip_vectordb,
         skip_persona=args.skip_persona

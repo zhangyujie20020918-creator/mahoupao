@@ -43,7 +43,7 @@ class MemoryEntry(BaseModel):
     """单条记忆条目"""
 
     date: str
-    blogger: str
+    soul: str
     summary: MemorySummary = MemorySummary()
 
 

@@ -7,7 +7,7 @@ from pydantic import BaseModel, field_validator
 
 
 class PersonaType(str, Enum):
-    INFLUENCER = "influencer"   # 网红/博主
+    INFLUENCER = "influencer"   # 网红/
     CELEBRITY = "celebrity"     # 明星
     EXPERT = "expert"           # 专家
     CHARACTER = "character"     # 虚拟角色

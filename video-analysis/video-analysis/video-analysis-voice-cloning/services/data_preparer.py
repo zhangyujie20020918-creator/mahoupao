@@ -1,6 +1,6 @@
 """
 数据准备服务
-从 downloads/{博主}/ 的 mp3 + ASR json 准备训练数据
+从 downloads/{}/ 的 mp3 + ASR json 准备训练数据
 """
 
 import json
@@ -73,15 +73,15 @@ class AudioSegmentInfo:
     output_path: Path
 
 
-def get_blogger_source_data(blogger_name: str) -> Dict[str, Any]:
-    """获取博主的源数据信息"""
-    blogger_dir = config.DOWNLOADS_DIR / blogger_name
+def get_soul_source_data(soul_name: str) -> Dict[str, Any]:
+    """获取的源数据信息"""
+    soul_dir = config.DOWNLOADS_DIR / soul_name
 
-    if not blogger_dir.exists():
-        return {"exists": False, "error": "博主目录不存在"}
+    if not soul_dir.exists():
+        return {"exists": False, "error": "目录不存在"}
 
     # 查找配对的 mp3 + json 文件
-    mp3_files = list(blogger_dir.glob("*.mp3"))
+    mp3_files = list(soul_dir.glob("*.mp3"))
     pairs = []
 
     for mp3_file in mp3_files:
@@ -95,15 +95,15 @@ def get_blogger_source_data(blogger_name: str) -> Dict[str, Any]:
 
     return {
         "exists": True,
-        "blogger_name": blogger_name,
-        "source_dir": str(blogger_dir),
+        "soul_name": soul_name,
+        "source_dir": str(soul_dir),
         "file_pairs": pairs,
         "total_pairs": len(pairs),
     }
 
 
 def prepare_dataset_stream(
-    blogger_name: str,
+    soul_name: str,
     min_duration: float = None,
     max_duration: float = None,
     enable_denoise: bool = True,
@@ -112,7 +112,7 @@ def prepare_dataset_stream(
     准备训练数据集 (流式输出进度)
 
     Args:
-        blogger_name: 博主名称
+        soul_name: 名称
         min_duration: 最小片段时长
         max_duration: 最大片段时长
         enable_denoise: 是否启用降噪
@@ -123,18 +123,18 @@ def prepare_dataset_stream(
     min_duration = min_duration or config.MIN_DURATION
     max_duration = max_duration or config.MAX_DURATION
 
-    blogger_dir = config.DOWNLOADS_DIR / blogger_name
-    dataset_dir = config.DATASETS_DIR / blogger_name
+    soul_dir = config.DOWNLOADS_DIR / soul_name
+    dataset_dir = config.DATASETS_DIR / soul_name
     audio_dir = dataset_dir / "audio"
 
     # 创建输出目录
     audio_dir.mkdir(parents=True, exist_ok=True)
 
     denoise_status = "已启用" if enable_denoise else "已禁用"
-    yield {"type": "start", "message": f"开始准备 {blogger_name} 的训练数据 (降噪: {denoise_status})"}
+    yield {"type": "start", "message": f"开始准备 {soul_name} 的训练数据 (降噪: {denoise_status})"}
 
     # 获取所有配对文件
-    mp3_files = sorted(blogger_dir.glob("*.mp3"))
+    mp3_files = sorted(soul_dir.glob("*.mp3"))
     valid_pairs = []
 
     for mp3_file in mp3_files:
@@ -213,7 +213,7 @@ def prepare_dataset_stream(
 
                 # 添加到标注列表
                 # 格式: audio_path|speaker|language|text
-                list_entries.append(f"audio/{output_filename}|{blogger_name}|zh|{text}")
+                list_entries.append(f"audio/{output_filename}|{soul_name}|zh|{text}")
                 valid_segments += 1
 
         except Exception as e:
@@ -226,13 +226,13 @@ def prepare_dataset_stream(
             continue
 
     # 写入标注文件
-    list_file = dataset_dir / f"{blogger_name}.list"
+    list_file = dataset_dir / f"{soul_name}.list"
     with open(list_file, "w", encoding="utf-8") as f:
         f.write("\n".join(list_entries))
 
     # 写入元数据
     metadata = {
-        "blogger_name": blogger_name,
+        "soul_name": soul_name,
         "total_files": total_files,
         "total_segments": total_segments,
         "valid_segments": valid_segments,
@@ -268,20 +268,20 @@ def prepare_dataset_stream(
     }
 
 
-def get_dataset_info(blogger_name: str) -> Dict[str, Any]:
+def get_dataset_info(soul_name: str) -> Dict[str, Any]:
     """获取已准备的数据集信息"""
-    dataset_dir = config.DATASETS_DIR / blogger_name
+    dataset_dir = config.DATASETS_DIR / soul_name
 
     if not dataset_dir.exists():
         return {"exists": False}
 
     metadata_file = dataset_dir / "metadata.json"
-    list_file = dataset_dir / f"{blogger_name}.list"
+    list_file = dataset_dir / f"{soul_name}.list"
     audio_dir = dataset_dir / "audio"
 
     result = {
         "exists": True,
-        "blogger_name": blogger_name,
+        "soul_name": soul_name,
         "dataset_dir": str(dataset_dir),
     }
 

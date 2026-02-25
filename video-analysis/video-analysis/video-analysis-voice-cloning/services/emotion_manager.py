@@ -86,19 +86,19 @@ EMOTION_CATEGORIES = {
 }
 
 
-def get_emotions_file(blogger_name: str) -> Path:
-    """获取博主的情绪标注文件路径"""
-    return config.DATASETS_DIR / blogger_name / "emotions.json"
+def get_emotions_file(soul_name: str) -> Path:
+    """获取的情绪标注文件路径"""
+    return config.DATASETS_DIR / soul_name / "emotions.json"
 
 
-def load_emotions(blogger_name: str) -> Dict[str, str]:
+def load_emotions(soul_name: str) -> Dict[str, str]:
     """
-    加载博主的情绪标注数据
+    加载的情绪标注数据
 
     Returns:
         Dict[audio_filename, emotion_key]
     """
-    emotions_file = get_emotions_file(blogger_name)
+    emotions_file = get_emotions_file(soul_name)
     if emotions_file.exists():
         try:
             with open(emotions_file, "r", encoding="utf-8") as f:
@@ -108,9 +108,9 @@ def load_emotions(blogger_name: str) -> Dict[str, str]:
     return {}
 
 
-def save_emotions(blogger_name: str, emotions: Dict[str, str]) -> bool:
+def save_emotions(soul_name: str, emotions: Dict[str, str]) -> bool:
     """保存情绪标注数据"""
-    emotions_file = get_emotions_file(blogger_name)
+    emotions_file = get_emotions_file(soul_name)
     try:
         emotions_file.parent.mkdir(parents=True, exist_ok=True)
         with open(emotions_file, "w", encoding="utf-8") as f:
@@ -126,22 +126,22 @@ def get_emotion_types() -> Dict[str, Any]:
     return EMOTION_TYPES
 
 
-def get_reference_audios(blogger_name: str) -> List[Dict[str, Any]]:
+def get_reference_audios(soul_name: str) -> List[Dict[str, Any]]:
     """
-    获取博主的所有参考音频及其情绪标签
+    获取的所有参考音频及其情绪标签
 
     Returns:
         List of {filename, text, duration, emotion, emotion_name}
     """
-    dataset_dir = config.DATASETS_DIR / blogger_name
-    list_file = dataset_dir / f"{blogger_name}.list"
+    dataset_dir = config.DATASETS_DIR / soul_name
+    list_file = dataset_dir / f"{soul_name}.list"
     audio_dir = dataset_dir / "audio"
 
     if not list_file.exists():
         return []
 
     # 加载情绪标注
-    emotions = load_emotions(blogger_name)
+    emotions = load_emotions(soul_name)
 
     audios = []
 
@@ -198,12 +198,12 @@ def get_reference_audios(blogger_name: str) -> List[Dict[str, Any]]:
     return audios
 
 
-def tag_emotion(blogger_name: str, filename: str, emotion: str) -> bool:
+def tag_emotion(soul_name: str, filename: str, emotion: str) -> bool:
     """
     为音频文件设置情绪标签
 
     Args:
-        blogger_name: 博主名称
+        soul_name: 名称
         filename: 音频文件名 (如 "0001.wav")
         emotion: 情绪类型 (如 "happy")
 
@@ -214,23 +214,23 @@ def tag_emotion(blogger_name: str, filename: str, emotion: str) -> bool:
         logger.error(f"无效的情绪类型: {emotion}")
         return False
 
-    emotions = load_emotions(blogger_name)
+    emotions = load_emotions(soul_name)
     emotions[filename] = emotion
-    return save_emotions(blogger_name, emotions)
+    return save_emotions(soul_name, emotions)
 
 
-def get_audio_by_emotion(blogger_name: str, emotion: str) -> Optional[Dict[str, Any]]:
+def get_audio_by_emotion(soul_name: str, emotion: str) -> Optional[Dict[str, Any]]:
     """
     获取指定情绪的参考音频
 
     Args:
-        blogger_name: 博主名称
+        soul_name: 名称
         emotion: 情绪类型
 
     Returns:
         音频信息，或 None
     """
-    audios = get_reference_audios(blogger_name)
+    audios = get_reference_audios(soul_name)
 
     # 首先尝试找到精确匹配的情绪
     for audio in audios:
@@ -245,9 +245,9 @@ def get_audio_by_emotion(blogger_name: str, emotion: str) -> Optional[Dict[str, 
     return None
 
 
-def get_emotion_statistics(blogger_name: str) -> Dict[str, int]:
+def get_emotion_statistics(soul_name: str) -> Dict[str, int]:
     """获取各情绪类型的音频数量统计"""
-    audios = get_reference_audios(blogger_name)
+    audios = get_reference_audios(soul_name)
 
     stats = {key: 0 for key in EMOTION_TYPES.keys()}
 

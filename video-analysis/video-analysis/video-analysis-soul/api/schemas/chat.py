@@ -9,7 +9,7 @@ class ChatRequest(BaseModel):
     """对话请求"""
 
     user_id: str
-    blogger: str
+    soul: str
     message: str
     model: Optional[str] = None
 

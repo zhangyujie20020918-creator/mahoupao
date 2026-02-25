@@ -35,20 +35,20 @@ app.add_middleware(
 
 
 class TrainRequest(BaseModel):
-    blogger_name: str
+    soul_name: str
     skip_optimization: bool = False
     skip_vectordb: bool = False
     skip_persona: bool = False
 
 
-def get_bloggers():
-    """获取所有博主目录"""
+def get_souls():
+    """获取所有目录"""
     settings = get_settings()
     downloads_dir = settings.downloads_dir
     if not downloads_dir.exists():
         return []
 
-    bloggers = []
+    souls = []
     for d in downloads_dir.iterdir():
         if d.is_dir() and not d.name.startswith("."):
             # 统计文件
@@ -63,7 +63,7 @@ def get_bloggers():
             has_vectordb = (output_dir / "chroma_db").exists()
             has_optimized = (output_dir / "optimized_texts").exists()
 
-            bloggers.append({
+            souls.append({
                 "name": d.name,
                 "video_count": len(mp4_files),
                 "audio_count": len(mp3_files),
@@ -74,7 +74,7 @@ def get_bloggers():
                 "has_optimized": has_optimized,
             })
 
-    return bloggers
+    return souls
 
 
 @app.get("/api/maker/status")
@@ -108,22 +108,22 @@ async def get_status():
     }
 
 
-@app.get("/api/maker/bloggers")
-async def list_bloggers():
-    """列出所有博主"""
-    return {"bloggers": get_bloggers()}
+@app.get("/api/maker/souls")
+async def list_souls():
+    """列出所有"""
+    return {"souls": get_souls()}
 
 
-@app.get("/api/maker/blogger/{blogger_name}")
-async def get_blogger_detail(blogger_name: str):
-    """获取博主详情"""
+@app.get("/api/maker/soul/{soul_name}")
+async def get_soul_detail(soul_name: str):
+    """获取详情"""
     settings = get_settings()
-    blogger_dir = settings.downloads_dir / blogger_name
+    soul_dir = settings.downloads_dir / soul_name
 
-    if not blogger_dir.exists():
-        raise HTTPException(status_code=404, detail="博主不存在")
+    if not soul_dir.exists():
+        raise HTTPException(status_code=404, detail="不存在")
 
-    output_dir = settings.output_dir / blogger_name
+    output_dir = settings.output_dir / soul_name
 
     # 读取人格画像
     persona = None
@@ -144,13 +144,13 @@ async def get_blogger_detail(blogger_name: str):
     chroma_dir = output_dir / "chroma_db"
     if chroma_dir.exists():
         try:
-            cm = ChromaManager(blogger_name, chroma_dir)
+            cm = ChromaManager(soul_name, chroma_dir)
             vectordb_stats = cm.get_stats()
         except Exception as e:
             logger.error(f"Error getting vectordb stats: {e}")
 
     return {
-        "name": blogger_name,
+        "name": soul_name,
         "persona": persona,
         "system_prompt": system_prompt,
         "vectordb_stats": vectordb_stats,
@@ -158,18 +158,18 @@ async def get_blogger_detail(blogger_name: str):
 
 
 @app.post("/api/maker/train")
-async def train_blogger(request: TrainRequest):
-    """训练博主 (流式响应)"""
+async def train_soul(request: TrainRequest):
+    """训练 (流式响应)"""
 
     async def generate() -> AsyncGenerator[str, None]:
         settings = get_settings()
-        blogger_dir = settings.downloads_dir / request.blogger_name
+        soul_dir = settings.downloads_dir / request.soul_name
 
-        if not blogger_dir.exists():
-            yield f"data: {json.dumps({'type': 'error', 'message': '博主目录不存在'})}\n\n"
+        if not soul_dir.exists():
+            yield f"data: {json.dumps({'type': 'error', 'message': '目录不存在'})}\n\n"
             return
 
-        output_dir = settings.get_blogger_output_dir(request.blogger_name)
+        output_dir = settings.get_soul_output_dir(request.soul_name)
 
         try:
             # Step 1: 文本优化
@@ -180,7 +180,7 @@ async def train_blogger(request: TrainRequest):
                 optimizer = TextOptimizer()
 
                 # 获取所有 ASR 文件
-                json_files = [f for f in blogger_dir.glob("*.json") if not f.name.startswith("_")]
+                json_files = [f for f in soul_dir.glob("*.json") if not f.name.startswith("_")]
                 total = len(json_files)
 
                 if total == 0:
@@ -192,7 +192,7 @@ async def train_blogger(request: TrainRequest):
                     yield f"data: {json.dumps({'type': 'progress', 'step': 1, 'current': i+1, 'total': total, 'file': json_path.stem})}\n\n"
                     await asyncio.sleep(0.1)
 
-                    result = optimizer.process_video_file(json_path, request.blogger_name)
+                    result = optimizer.process_video_file(json_path, request.soul_name)
                     if result:
                         optimized_videos.append(result)
 
@@ -204,7 +204,7 @@ async def train_blogger(request: TrainRequest):
                     return
             else:
                 yield f"data: {json.dumps({'type': 'step', 'step': 1, 'message': '跳过文本优化，加载已有结果...'})}\n\n"
-                optimized_videos = load_optimized_videos(output_dir, request.blogger_name)
+                optimized_videos = load_optimized_videos(output_dir, request.soul_name)
                 if not optimized_videos:
                     yield f"data: {json.dumps({'type': 'error', 'message': '没有找到已优化的文本'})}\n\n"
                     return
@@ -218,7 +218,7 @@ async def train_blogger(request: TrainRequest):
                 await asyncio.sleep(0.1)
 
                 try:
-                    chroma_manager = ChromaManager(request.blogger_name, output_dir / "chroma_db")
+                    chroma_manager = ChromaManager(request.soul_name, output_dir / "chroma_db")
                     chroma_manager.add_videos(optimized_videos)
                     stats = chroma_manager.get_stats()
                     doc_count = stats['document_count']
@@ -239,7 +239,7 @@ async def train_blogger(request: TrainRequest):
 
                 try:
                     generator = PromptGenerator()
-                    persona = generator.create_blogger_persona(optimized_videos)
+                    persona = generator.create_soul_persona(optimized_videos)
 
                     if persona:
                         generator.save_persona(persona, output_dir)
@@ -265,7 +265,7 @@ async def train_blogger(request: TrainRequest):
     )
 
 
-def load_optimized_videos(output_dir: Path, blogger_name: str):
+def load_optimized_videos(output_dir: Path, soul_name: str):
     """从已保存的文件加载优化后的视频"""
     from processors.text_optimizer import OptimizedVideo, OptimizedSegment
 
@@ -292,7 +292,7 @@ def load_optimized_videos(output_dir: Path, blogger_name: str):
 
             video = OptimizedVideo(
                 video_title=data["video_title"],
-                blogger_name=data["blogger_name"],
+                soul_name=data["soul_name"],
                 original_full_text=data["original_full_text"],
                 optimized_full_text=data["optimized_full_text"],
                 segments=segments

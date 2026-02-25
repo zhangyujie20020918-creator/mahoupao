@@ -2,7 +2,7 @@
 
 ## 项目目标
 
-使用 GPT-SoVITS 克隆博主声音，支持：
+使用 GPT-SoVITS 克隆声音，支持：
 1. 从现有数据（mp3 + ASR）准备训练数据
 2. 微调训练（5-10分钟音频）
 3. 语音合成推理
@@ -39,13 +39,13 @@ video-analysis-voice-cloning/
 │   ├── pretrained/           # GPT-SoVITS 预训练
 │   ├── g2pw/                 # 中文拼音模型
 │   └── trained/              # 训练后的模型
-│       └── {博主名}/
+│       └── {名}/
 │           ├── gpt.ckpt      # GPT 模型
 │           └── sovits.pth    # SoVITS 模型
 ├── datasets/                 # 训练数据集
-│   └── {博主名}/
+│   └── {名}/
 │       ├── audio/            # 切片后的音频
-│       ├── {博主名}.list     # 标注文件
+│       ├── {名}.list     # 标注文件
 │       └── metadata.json     # 数据集信息
 └── output/                   # 合成输出
 ```
@@ -56,11 +56,11 @@ video-analysis-voice-cloning/
 
 ### 1. 数据准备 (data_preparer.py)
 
-从 `downloads/{博主名}/` 读取数据：
+从 `downloads/{名}/` 读取数据：
 
 ```python
 # 输入
-downloads/{博主名}/
+downloads/{名}/
 ├── 视频1.mp3              # 音频
 ├── 视频1.json             # ASR结果（含segments时间戳）
 └── 视频1.txt              # 清洗后的文本
@@ -74,19 +74,19 @@ downloads/{博主名}/
 4. 生成 .list 标注文件
 
 # 输出
-datasets/{博主名}/
+datasets/{名}/
 ├── audio/
 │   ├── 0001.wav           # 切片音频 (转换为wav)
 │   ├── 0002.wav
 │   └── ...
-├── {博主名}.list          # 标注文件
+├── {名}.list          # 标注文件
 └── metadata.json          # 统计信息
 ```
 
 **标注文件格式** (.list):
 ```
-audio/0001.wav|博主名|zh|你好我是财经小艾
-audio/0002.wav|博主名|zh|今天给大家聊一聊AI
+audio/0001.wav|名|zh|你好我是财经小艾
+audio/0002.wav|名|zh|今天给大家聊一聊AI
 ```
 
 ### 2. 模型下载 (model_downloader.py)
@@ -112,12 +112,12 @@ Step 1: 数据预处理
 
 Step 2: GPT 训练
 ├── 输入: 音素 + 语义token
-├── 输出: gpt_{博主名}.ckpt
+├── 输出: gpt_{名}.ckpt
 └── 时长: 约 10-30 分钟
 
 Step 3: SoVITS 训练
 ├── 输入: 声学特征
-├── 输出: sovits_{博主名}.pth
+├── 输出: sovits_{名}.pth
 └── 时长: 约 20-60 分钟
 ```
 
@@ -127,7 +127,7 @@ Step 3: SoVITS 训练
 # 推理接口
 def synthesize(
     text: str,              # 要合成的文本
-    blogger_name: str,      # 博主名（加载对应模型）
+    soul_name: str,      # 名（加载对应模型）
     ref_audio: str = None,  # 参考音频（可选，用于调整语气）
     speed: float = 1.0,     # 语速
 ) -> bytes:                 # 返回音频数据
@@ -143,8 +143,8 @@ def synthesize(
 
 ```
 GET  /api/voice/status           # 服务状态（GPU、模型）
-GET  /api/voice/bloggers         # 博主列表（含训练状态）
-GET  /api/voice/blogger/{name}   # 博主详情
+GET  /api/voice/souls         # 列表（含训练状态）
+GET  /api/voice/soul/{name}   # 详情
 
 POST /api/voice/prepare          # 准备训练数据（流式进度）
 POST /api/voice/train            # 开始训练（流式进度）
@@ -159,21 +159,21 @@ POST /api/voice/models/download  # 下载预训练模型（流式进度）
 ```json
 // POST /api/voice/prepare
 {
-  "blogger_name": "小艾财经说 - 抖音",
+  "soul_name": "小艾财经说 - 抖音",
   "min_duration": 3.0,
   "max_duration": 15.0
 }
 
 // POST /api/voice/train
 {
-  "blogger_name": "小艾财经说 - 抖音",
+  "soul_name": "小艾财经说 - 抖音",
   "epochs": 10,
   "batch_size": 4
 }
 
 // POST /api/voice/synthesize
 {
-  "blogger_name": "小艾财经说 - 抖音",
+  "soul_name": "小艾财经说 - 抖音",
   "text": "大家好，我是财经小艾",
   "speed": 1.0
 }
@@ -192,10 +192,10 @@ POST /api/voice/models/download  # 下载预训练模型（流式进度）
 │  系统状态                                       │
 │  ┌─────────┐  ┌─────────┐  ┌─────────┐        │
 │  │ GPU     │  │ 预训练   │  │ 训练数   │        │
-│  │ RTX4090 │  │ 已下载   │  │ 2个博主  │        │
+│  │ RTX4090 │  │ 已下载   │  │ 2个  │        │
 │  └─────────┘  └─────────┘  └─────────┘        │
 ├────────────────────────────────────────────────┤
-│  选择博主                                       │
+│  选择                                       │
 │  ┌──────────────────────────────────────────┐ │
 │  │ 小艾财经说 - 抖音                         │ │
 │  │ 38个视频 | 120段音频 | [已训练]           │ │
@@ -233,14 +233,14 @@ Soul 项目调用方式：
 
 ```python
 # soul 项目中
-async def chat_with_voice(message: str, blogger: str) -> dict:
+async def chat_with_voice(message: str, soul: str) -> dict:
     # 1. 获取文本回复（使用 persona + RAG）
-    reply_text = await generate_reply(message, blogger)
+    reply_text = await generate_reply(message, soul)
 
     # 2. 调用 voice-cloning API 合成语音
     audio = await voice_api.synthesize(
         text=reply_text,
-        blogger_name=blogger
+        soul_name=soul
     )
 
     return {

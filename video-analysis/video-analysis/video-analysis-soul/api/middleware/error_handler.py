@@ -6,7 +6,9 @@ from fastapi.responses import JSONResponse
 from common.exceptions import (
     SoulBaseError,
     PersonaNotFoundError,
+    RegistrationError,
     UserNotFoundError,
+    VerificationError,
     LLMError,
 )
 from common.logger import get_logger
@@ -28,6 +30,20 @@ def register_error_handlers(app: FastAPI) -> None:
     async def persona_not_found_handler(request: Request, exc: PersonaNotFoundError):
         return JSONResponse(
             status_code=404,
+            content={"success": False, "error": exc.message, "detail": exc.detail},
+        )
+
+    @app.exception_handler(VerificationError)
+    async def verification_error_handler(request: Request, exc: VerificationError):
+        return JSONResponse(
+            status_code=403,
+            content={"success": False, "error": exc.message, "detail": exc.detail},
+        )
+
+    @app.exception_handler(RegistrationError)
+    async def registration_error_handler(request: Request, exc: RegistrationError):
+        return JSONResponse(
+            status_code=409,
             content={"success": False, "error": exc.message, "detail": exc.detail},
         )
 

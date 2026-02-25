@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class BloggerPersona:
-    """博主人格画像"""
-    blogger_name: str
+class SoulPersona:
+    """人格画像"""
+    soul_name: str
     speaking_style: str          # 说话风格
     common_phrases: List[str]    # 常用语句/口头禅
     topic_expertise: List[str]   # 擅长话题
@@ -29,13 +29,13 @@ class BloggerPersona:
 
 
 class PromptGenerator:
-    """分析博主风格并生成模拟 prompt"""
+    """分析风格并生成模拟 prompt"""
 
-    ANALYSIS_PROMPT = """你是一个专业的内容分析专家。请分析以下博主的视频文本内容，提取其说话风格和人物特征。
+    ANALYSIS_PROMPT = """你是一个专业的内容分析专家。请分析以下的视频文本内容，提取其说话风格和人物特征。
 
-博主名称：{blogger_name}
+名称：{soul_name}
 
-以下是该博主的多个视频文本内容：
+以下是该的多个视频文本内容：
 ---
 {video_texts}
 ---
@@ -53,9 +53,9 @@ class PromptGenerator:
 
 只返回 JSON，不要其他内容："""
 
-    PERSONA_PROMPT_TEMPLATE = """你是一个专业的 AI 角色设计师。基于以下博主的人物分析，请生成一个用于让 AI 模拟该博主进行对话的系统 prompt。
+    PERSONA_PROMPT_TEMPLATE = """你是一个专业的 AI 角色设计师。基于以下的人物分析，请生成一个用于让 AI 模拟该进行对话的系统 prompt。
 
-博主名称：{blogger_name}
+名称：{soul_name}
 
 人物分析：
 - 说话风格：{speaking_style}
@@ -70,9 +70,9 @@ class PromptGenerator:
 {sample_texts}
 
 请生成一个详细的系统 prompt，要求：
-1. 让 AI 能准确模拟该博主的说话风格和语气
-2. 包含该博主的知识领域和专业背景
-3. 包含该博主的常用表达方式和口头禅
+1. 让 AI 能准确模拟该的说话风格和语气
+2. 包含该的知识领域和专业背景
+3. 包含该的常用表达方式和口头禅
 4. 指导 AI 如何组织回答内容
 5. prompt 应该是第二人称，直接告诉 AI "你是..."
 
@@ -84,12 +84,12 @@ class PromptGenerator:
         self.model = genai.GenerativeModel(self.settings.gemini_model)
         logger.info(f"PromptGenerator initialized with model: {self.settings.gemini_model}")
 
-    def analyze_blogger(self, videos: List[OptimizedVideo]) -> Optional[Dict[str, Any]]:
+    def analyze_soul(self, videos: List[OptimizedVideo]) -> Optional[Dict[str, Any]]:
         """
-        分析博主的说话风格和特征
+        分析的说话风格和特征
 
         Args:
-            videos: 博主的视频列表
+            videos: 的视频列表
 
         Returns:
             分析结果字典
@@ -98,7 +98,7 @@ class PromptGenerator:
             logger.warning("No videos provided for analysis")
             return None
 
-        blogger_name = videos[0].blogger_name
+        soul_name = videos[0].soul_name
 
         # 组合所有视频文本
         video_texts = "\n\n".join([
@@ -108,7 +108,7 @@ class PromptGenerator:
 
         try:
             prompt = self.ANALYSIS_PROMPT.format(
-                blogger_name=blogger_name,
+                soul_name=soul_name,
                 video_texts=video_texts
             )
 
@@ -121,24 +121,24 @@ class PromptGenerator:
                 result_text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
 
             analysis = json.loads(result_text)
-            logger.info(f"Successfully analyzed blogger: {blogger_name}")
+            logger.info(f"Successfully analyzed soul: {soul_name}")
             return analysis
 
         except Exception as e:
-            logger.error(f"Error analyzing blogger {blogger_name}: {e}")
+            logger.error(f"Error analyzing soul {soul_name}: {e}")
             return None
 
     def generate_persona_prompt(
         self,
-        blogger_name: str,
+        soul_name: str,
         analysis: Dict[str, Any],
         sample_videos: List[OptimizedVideo]
     ) -> str:
         """
-        生成模拟博主的系统 prompt
+        生成模拟的系统 prompt
 
         Args:
-            blogger_name: 博主名称
+            soul_name: 名称
             analysis: 分析结果
             sample_videos: 示例视频
 
@@ -153,7 +153,7 @@ class PromptGenerator:
 
         try:
             prompt = self.PERSONA_PROMPT_TEMPLATE.format(
-                blogger_name=blogger_name,
+                soul_name=soul_name,
                 speaking_style=analysis.get("speaking_style", "未知"),
                 common_phrases=", ".join(analysis.get("common_phrases", [])),
                 topic_expertise=", ".join(analysis.get("topic_expertise", [])),
@@ -166,16 +166,16 @@ class PromptGenerator:
 
             response = self.model.generate_content(prompt)
             system_prompt = response.text.strip()
-            logger.info(f"Successfully generated persona prompt for: {blogger_name}")
+            logger.info(f"Successfully generated persona prompt for: {soul_name}")
             return system_prompt
 
         except Exception as e:
             logger.error(f"Error generating persona prompt: {e}")
-            return self._generate_fallback_prompt(blogger_name, analysis)
+            return self._generate_fallback_prompt(soul_name, analysis)
 
-    def _generate_fallback_prompt(self, blogger_name: str, analysis: Dict[str, Any]) -> str:
+    def _generate_fallback_prompt(self, soul_name: str, analysis: Dict[str, Any]) -> str:
         """生成降级版本的系统 prompt"""
-        return f"""你是{blogger_name}，一位专注于{", ".join(analysis.get("topic_expertise", ["财经"]))}领域的内容创作者。
+        return f"""你是{soul_name}，一位专注于{", ".join(analysis.get("topic_expertise", ["财经"]))}领域的内容创作者。
 
 你的说话风格是{analysis.get("speaking_style", "专业且亲切")}，语气{analysis.get("tone", "轻松但不失专业")}。
 
@@ -189,32 +189,32 @@ class PromptGenerator:
 5. 按照你惯常的内容模式（{analysis.get("content_patterns", "清晰有条理")}）组织回答
 """
 
-    def create_blogger_persona(self, videos: List[OptimizedVideo]) -> Optional[BloggerPersona]:
+    def create_soul_persona(self, videos: List[OptimizedVideo]) -> Optional[SoulPersona]:
         """
-        创建完整的博主人格画像
+        创建完整的人格画像
 
         Args:
-            videos: 博主的视频列表
+            videos: 的视频列表
 
         Returns:
-            BloggerPersona 对象
+            SoulPersona 对象
         """
         if not videos:
             return None
 
-        blogger_name = videos[0].blogger_name
+        soul_name = videos[0].soul_name
 
-        # 分析博主
-        analysis = self.analyze_blogger(videos)
+        # 分析
+        analysis = self.analyze_soul(videos)
         if not analysis:
             return None
 
         # 生成系统 prompt
-        system_prompt = self.generate_persona_prompt(blogger_name, analysis, videos)
+        system_prompt = self.generate_persona_prompt(soul_name, analysis, videos)
 
         # 创建人格画像
-        persona = BloggerPersona(
-            blogger_name=blogger_name,
+        persona = SoulPersona(
+            soul_name=soul_name,
             speaking_style=analysis.get("speaking_style", ""),
             common_phrases=analysis.get("common_phrases", []),
             topic_expertise=analysis.get("topic_expertise", []),
@@ -227,8 +227,8 @@ class PromptGenerator:
 
         return persona
 
-    def save_persona(self, persona: BloggerPersona, output_dir: Path):
-        """保存博主人格画像"""
+    def save_persona(self, persona: SoulPersona, output_dir: Path):
+        """保存人格画像"""
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # 保存完整的人格画像（JSON）
@@ -241,4 +241,4 @@ class PromptGenerator:
         with open(prompt_path, "w", encoding="utf-8") as f:
             f.write(persona.system_prompt)
 
-        logger.info(f"Saved persona for {persona.blogger_name} to {output_dir}")
+        logger.info(f"Saved persona for {persona.soul_name} to {output_dir}")

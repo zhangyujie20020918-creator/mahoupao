@@ -25,7 +25,7 @@ class OptimizedSegment:
 class OptimizedVideo:
     """优化后的视频文本"""
     video_title: str
-    blogger_name: str
+    soul_name: str
     original_full_text: str
     optimized_full_text: str
     segments: List[OptimizedSegment] = field(default_factory=list)
@@ -33,7 +33,7 @@ class OptimizedVideo:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "video_title": self.video_title,
-            "blogger_name": self.blogger_name,
+            "soul_name": self.soul_name,
             "original_full_text": self.original_full_text,
             "optimized_full_text": self.optimized_full_text,
             "segments": [asdict(seg) for seg in self.segments]
@@ -122,7 +122,7 @@ class TextOptimizer:
             logger.error(f"Error batch optimizing segments: {e}")
             return texts  # 失败时返回原文列表
 
-    def process_video_file(self, json_path: Path, blogger_name: str) -> Optional[OptimizedVideo]:
+    def process_video_file(self, json_path: Path, soul_name: str) -> Optional[OptimizedVideo]:
         """处理单个视频的 JSON 文件"""
         try:
             with open(json_path, "r", encoding="utf-8") as f:
@@ -137,7 +137,7 @@ class TextOptimizer:
                 optimized_full_text = self.optimize_text(original_full_text)
                 return OptimizedVideo(
                     video_title=video_title,
-                    blogger_name=blogger_name,
+                    soul_name=soul_name,
                     original_full_text=original_full_text,
                     optimized_full_text=optimized_full_text,
                     segments=[]
@@ -162,7 +162,7 @@ class TextOptimizer:
 
             return OptimizedVideo(
                 video_title=video_title,
-                blogger_name=blogger_name,
+                soul_name=soul_name,
                 original_full_text=original_full_text,
                 optimized_full_text=optimized_full_text,
                 segments=optimized_segments
@@ -172,24 +172,24 @@ class TextOptimizer:
             logger.error(f"Error processing video file {json_path}: {e}")
             return None
 
-    def process_blogger(self, blogger_dir: Path) -> List[OptimizedVideo]:
-        """处理一个博主的所有视频"""
-        blogger_name = blogger_dir.name
-        logger.info(f"Processing blogger: {blogger_name}")
+    def process_soul(self, soul_dir: Path) -> List[OptimizedVideo]:
+        """处理一个的所有视频"""
+        soul_name = soul_dir.name
+        logger.info(f"Processing soul: {soul_name}")
 
         # 获取所有 ASR JSON 文件（排除 _metadata.json）
         json_files = [
-            f for f in blogger_dir.glob("*.json")
+            f for f in soul_dir.glob("*.json")
             if not f.name.startswith("_")
         ]
 
         optimized_videos = []
-        for json_path in tqdm(json_files, desc=f"Optimizing {blogger_name}"):
-            result = self.process_video_file(json_path, blogger_name)
+        for json_path in tqdm(json_files, desc=f"Optimizing {soul_name}"):
+            result = self.process_video_file(json_path, soul_name)
             if result:
                 optimized_videos.append(result)
 
-        logger.info(f"Processed {len(optimized_videos)} videos for {blogger_name}")
+        logger.info(f"Processed {len(optimized_videos)} videos for {soul_name}")
         return optimized_videos
 
     def save_optimized_texts(self, videos: List[OptimizedVideo], output_dir: Path):

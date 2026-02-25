@@ -189,7 +189,7 @@ python run_server.py
 ### 功能
 1. **ASR 文本优化**: 使用 Gemini 1.5 Pro 修正听写错误
 2. **向量数据库**: 使用 ChromaDB + BGE 中文 embedding 构建
-3. **博主人格画像**: 分析说话风格，生成模拟 prompt
+3. **人格画像**: 分析说话风格，生成模拟 prompt
 
 ### 项目结构
 ```
@@ -201,7 +201,7 @@ video-analysis-maker/
 │   ├── __init__.py
 │   ├── text_optimizer.py    # Gemini ASR 文本优化
 │   ├── embedder.py          # BGE 中文 embedding
-│   └── prompt_generator.py  # 博主人格画像生成
+│   └── prompt_generator.py  # 人格画像生成
 ├── storage/
 │   ├── __init__.py
 │   └── chroma_manager.py    # ChromaDB 向量数据库
@@ -219,14 +219,14 @@ video-analysis-maker/
 - **处理粒度**: 按 ASR segments 分段 + 上下文扩展
 
 ### 输出物
-处理完成后，每个博主会生成：
+处理完成后，每个会生成：
 ```
-output/{博主名}/
+output/{名}/
 ├── optimized_texts/         # 优化后的文本
 │   ├── 视频标题.json        # 含分段信息
 │   └── 视频标题.txt         # 纯文本
 ├── chroma_db/               # 向量数据库 (供 RAG 使用)
-├── persona.json             # 博主人格画像
+├── persona.json             # 人格画像
 └── system_prompt.txt        # 可直接使用的系统 prompt
 ```
 
@@ -234,16 +234,16 @@ output/{博主名}/
 ```bash
 cd video-analysis-maker
 conda activate video-analysis
-python main.py --list-bloggers        # 查看可用博主
-python main.py                         # 处理所有博主
-python main.py --blogger "小艾财经说 - 抖音"  # 处理指定博主
+python main.py --list-souls        # 查看可用
+python main.py                         # 处理所有
+python main.py --soul "小艾财经说 - 抖音"  # 处理指定
 ```
 
 ### 状态: 代码已完成，待测试
 
 ### 下一步: video-analysis-soul
 - 基于 maker 生成的数据，提供 API 服务
-- 让用户可以与"博主"进行对话交互
+- 让用户可以与""进行对话交互
 - 使用 RAG 检索 + 人格 prompt 实现风格模拟
 
 ---

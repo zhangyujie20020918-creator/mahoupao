@@ -17,7 +17,7 @@ async def knowledge_retrieval(state: SoulState, **deps) -> dict:
 
     try:
         results = await retrieval_service.search_knowledge(
-            persona_name=state["blogger_name"],
+            persona_name=state["soul_name"],
             query=state["user_message"],
         )
 
@@ -35,13 +35,13 @@ async def knowledge_retrieval(state: SoulState, **deps) -> dict:
         logger.info(f"Knowledge retrieval: found {len(results)} results")
 
         return {
-            "blogger_context": results,
+            "soul_context": results,
             "sources": sources,
         }
 
     except Exception as e:
         logger.error(f"Knowledge retrieval failed: {e}")
         return {
-            "blogger_context": [],
+            "soul_context": [],
             "sources": [],
         }

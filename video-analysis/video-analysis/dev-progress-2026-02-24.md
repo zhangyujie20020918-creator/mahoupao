@@ -15,7 +15,7 @@
 - `video-analysis-web/voice.html` - 声音克隆页面
   - 计算设备显示 (GPU/CPU)
   - 预训练模型下载
-  - 博主选择
+  - 选择
   - 数据准备
   - 训练界面 (Loss 曲线 + 进度条)
   - 语音合成测试
@@ -61,7 +61,7 @@
 | 特殊场景 | 8 | 好奇、神秘、讲故事、讲解、劝说、安慰、鼓励、警告 |
 | 互动场景 | 8 | 打招呼、感谢、道歉、提问、回答、赞同、反对、结束语 |
 
-**API**: `/api/voice/emotions`, `/api/voice/emotions/{blogger}/audios`, `/api/voice/emotions/{blogger}/tag`
+**API**: `/api/voice/emotions`, `/api/voice/emotions/{soul}/audios`, `/api/voice/emotions/{soul}/tag`
 
 ---
 
@@ -80,7 +80,7 @@
 | 情绪 | 5 | 耶、哼、呜、嘛、切 |
 | 回应 | 3 | 对对对、不是、好的 |
 | 拟声 | 3 | 吃东西声、喝水声、呼吸声 |
-| 口头禅 | 3 | 博主自定义口头禅 |
+| 口头禅 | 3 | 自定义口头禅 |
 
 **合成逻辑**:
 ```
@@ -91,7 +91,7 @@
   ↓ 拼接输出
 ```
 
-**API**: `/api/voice/expressions/types`, `/api/voice/expressions/{blogger}`, `/api/voice/expressions/{blogger}/extract`
+**API**: `/api/voice/expressions/types`, `/api/voice/expressions/{soul}`, `/api/voice/expressions/{soul}/extract`
 
 ---
 
@@ -144,7 +144,7 @@
 - [ ] 自动检测 - 从训练数据识别笑声/语气词
 - [ ] 表情强度控制 - 轻笑 vs 大笑
 - [ ] 批量提取工具 - 一键提取所有表情片段
-- [ ] 口头禅学习 - 自动学习博主特有口头禅
+- [ ] 口头禅学习 - 自动学习特有口头禅
 
 ---
 
@@ -174,13 +174,13 @@ video-analysis-voice-cloning/
 │   │   ├── chinese-roberta-wwm-ext-large/
 │   │   └── G2PWModel/
 │   └── trained/             # 训练后的模型
-│       └── {博主名}/
+│       └── {名}/
 │           ├── gpt.ckpt
 │           └── sovits.pth
 ├── datasets/                # 训练数据集
-│   └── {博主名}/
+│   └── {名}/
 │       ├── audio/           # WAV 音频片段
-│       ├── {博主名}.list    # 训练标注文件
+│       ├── {名}.list    # 训练标注文件
 │       ├── metadata.json    # 元数据
 │       ├── emotions.json    # 情绪标注
 │       └── expressions/     # 表情音频库
@@ -228,5 +228,5 @@ http://localhost:5173/voice.html
 |------|------|
 | **不移除，而是增强** | 语气词、笑声让声音更有人味 |
 | **真实录音替换** | TTS 模拟效果差的部分用真实录音 |
-| **情绪多样化** | 同一博主可以有多种情绪风格 |
+| **情绪多样化** | 同一可以有多种情绪风格 |
 | **持续扩展** | 分类设计便于后续补充新类型 |

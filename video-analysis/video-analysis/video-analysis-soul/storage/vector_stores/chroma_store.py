@@ -286,7 +286,7 @@ class ChromaStore:
 
         collection = client.get_or_create_collection(
             name=collection_name,
-            metadata={"blogger": persona_name, "hnsw:space": "cosine"},
+            metadata={"soul": persona_name, "hnsw:space": "cosine"},
         )
 
         # 批量编码和写入
@@ -328,7 +328,7 @@ class ChromaStore:
         文件格式（与 maker 一致）:
         {
             "video_title": "...",
-            "blogger_name": "...",
+            "soul_name": "...",
             "segments": [
                 {"optimized_text": "...", "segment_index": 0, "start": 0.0, "end": 5.0},
                 ...
@@ -363,7 +363,7 @@ class ChromaStore:
                     all_texts.append(text)
                     all_metadatas.append({
                         "video_title": video_title,
-                        "blogger_name": persona_name,
+                        "soul_name": persona_name,
                         "segment_index": seg_idx,
                         "start": float(seg.get("start", 0.0)),
                         "end": float(seg.get("end", 0.0)),
@@ -379,7 +379,7 @@ class ChromaStore:
                 all_texts.append(text)
                 all_metadatas.append({
                     "video_title": video_title,
-                    "blogger_name": persona_name,
+                    "soul_name": persona_name,
                     "segment_index": 0,
                     "start": 0.0,
                     "end": 0.0,

@@ -38,7 +38,7 @@ class ConversationRepository:
         return DailyConversation(
             date=date,
             user_id=user_id,
-            blogger=persona_name,
+            soul=persona_name,
         )
 
     async def get_by_date(
@@ -55,7 +55,7 @@ class ConversationRepository:
         """保存对话"""
         path = self._conv_path(
             conversation.user_id,
-            conversation.blogger,
+            conversation.soul,
             conversation.date,
         )
         path.parent.mkdir(parents=True, exist_ok=True)

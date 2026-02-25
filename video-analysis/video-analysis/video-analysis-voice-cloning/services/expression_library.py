@@ -258,21 +258,21 @@ EXPRESSION_TYPES = {
     # ========== 口头禅/个人特色类 ==========
     "catchphrase_1": {
         "name": "口头禅1",
-        "description": "博主特有口头禅",
+        "description": "特有口头禅",
         "triggers": [],  # 用户自定义
         "color": "#c084fc",
         "category": "catchphrase",
     },
     "catchphrase_2": {
         "name": "口头禅2",
-        "description": "博主特有口头禅",
+        "description": "特有口头禅",
         "triggers": [],
         "color": "#a855f7",
         "category": "catchphrase",
     },
     "catchphrase_3": {
         "name": "口头禅3",
-        "description": "博主特有口头禅",
+        "description": "特有口头禅",
         "triggers": [],
         "color": "#9333ea",
         "category": "catchphrase",
@@ -297,7 +297,7 @@ EXPRESSION_CATEGORIES = {
 class ExpressionClip:
     """表情音频片段"""
     id: str                    # 唯一ID
-    blogger_name: str          # 博主名称
+    soul_name: str          # 名称
     expression_type: str       # 表情类型
     source_file: str           # 来源音频文件
     start_time: float          # 开始时间 (秒)
@@ -307,19 +307,19 @@ class ExpressionClip:
     duration: float            # 时长
 
 
-def get_library_dir(blogger_name: str) -> Path:
-    """获取博主的表情库目录"""
-    return config.DATASETS_DIR / blogger_name / "expressions"
+def get_library_dir(soul_name: str) -> Path:
+    """获取的表情库目录"""
+    return config.DATASETS_DIR / soul_name / "expressions"
 
 
-def get_library_file(blogger_name: str) -> Path:
+def get_library_file(soul_name: str) -> Path:
     """获取表情库索引文件"""
-    return get_library_dir(blogger_name) / "library.json"
+    return get_library_dir(soul_name) / "library.json"
 
 
-def load_library(blogger_name: str) -> List[ExpressionClip]:
+def load_library(soul_name: str) -> List[ExpressionClip]:
     """加载表情库"""
-    library_file = get_library_file(blogger_name)
+    library_file = get_library_file(soul_name)
     if not library_file.exists():
         return []
 
@@ -332,15 +332,15 @@ def load_library(blogger_name: str) -> List[ExpressionClip]:
         return []
 
 
-def save_library(blogger_name: str, clips: List[ExpressionClip]) -> bool:
+def save_library(soul_name: str, clips: List[ExpressionClip]) -> bool:
     """保存表情库"""
-    library_dir = get_library_dir(blogger_name)
+    library_dir = get_library_dir(soul_name)
     library_dir.mkdir(parents=True, exist_ok=True)
-    library_file = get_library_file(blogger_name)
+    library_file = get_library_file(soul_name)
 
     try:
         data = {
-            "blogger_name": blogger_name,
+            "soul_name": soul_name,
             "clips": [asdict(clip) for clip in clips],
         }
         with open(library_file, "w", encoding="utf-8") as f:
@@ -352,7 +352,7 @@ def save_library(blogger_name: str, clips: List[ExpressionClip]) -> bool:
 
 
 def extract_expression_clip(
-    blogger_name: str,
+    soul_name: str,
     source_audio: str,
     start_time: float,
     end_time: float,
@@ -363,7 +363,7 @@ def extract_expression_clip(
     从音频中提取表情片段
 
     Args:
-        blogger_name: 博主名称
+        soul_name: 名称
         source_audio: 源音频文件路径
         start_time: 开始时间 (秒)
         end_time: 结束时间 (秒)
@@ -377,7 +377,7 @@ def extract_expression_clip(
         logger.error(f"无效的表情类型: {expression_type}")
         return None
 
-    library_dir = get_library_dir(blogger_name)
+    library_dir = get_library_dir(soul_name)
     library_dir.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -405,7 +405,7 @@ def extract_expression_clip(
 
         clip = ExpressionClip(
             id=clip_id,
-            blogger_name=blogger_name,
+            soul_name=soul_name,
             expression_type=expression_type,
             source_file=source_audio,
             start_time=start_time,
@@ -416,9 +416,9 @@ def extract_expression_clip(
         )
 
         # 添加到库
-        clips = load_library(blogger_name)
+        clips = load_library(soul_name)
         clips.append(clip)
-        save_library(blogger_name, clips)
+        save_library(soul_name, clips)
 
         logger.info(f"提取表情片段: {expression_type} - '{text}' ({duration:.2f}s)")
         return clip
@@ -428,9 +428,9 @@ def extract_expression_clip(
         return None
 
 
-def delete_expression_clip(blogger_name: str, clip_id: str) -> bool:
+def delete_expression_clip(soul_name: str, clip_id: str) -> bool:
     """删除表情片段"""
-    clips = load_library(blogger_name)
+    clips = load_library(soul_name)
 
     # 找到并删除
     new_clips = []
@@ -447,29 +447,29 @@ def delete_expression_clip(blogger_name: str, clip_id: str) -> bool:
             new_clips.append(clip)
 
     if deleted:
-        save_library(blogger_name, new_clips)
+        save_library(soul_name, new_clips)
 
     return deleted
 
 
-def get_expression_by_type(blogger_name: str, expression_type: str) -> List[ExpressionClip]:
+def get_expression_by_type(soul_name: str, expression_type: str) -> List[ExpressionClip]:
     """获取指定类型的所有表情片段"""
-    clips = load_library(blogger_name)
+    clips = load_library(soul_name)
     return [c for c in clips if c.expression_type == expression_type]
 
 
-def get_random_expression(blogger_name: str, expression_type: str) -> Optional[ExpressionClip]:
+def get_random_expression(soul_name: str, expression_type: str) -> Optional[ExpressionClip]:
     """随机获取一个指定类型的表情片段"""
     import random
-    clips = get_expression_by_type(blogger_name, expression_type)
+    clips = get_expression_by_type(soul_name, expression_type)
     if clips:
         return random.choice(clips)
     return None
 
 
-def get_library_stats(blogger_name: str) -> Dict[str, int]:
+def get_library_stats(soul_name: str) -> Dict[str, int]:
     """获取表情库统计"""
-    clips = load_library(blogger_name)
+    clips = load_library(soul_name)
     stats = {key: 0 for key in EXPRESSION_TYPES.keys()}
     for clip in clips:
         if clip.expression_type in stats:
@@ -506,7 +506,7 @@ def detect_expressions_in_text(text: str) -> List[Tuple[str, str, int, int]]:
 def synthesize_with_expressions(
     synthesize_func,
     text: str,
-    blogger_name: str,
+    soul_name: str,
     **kwargs,
 ) -> Dict[str, Any]:
     """
@@ -523,16 +523,16 @@ def synthesize_with_expressions(
 
     if not expressions:
         # 没有表情，直接合成
-        return synthesize_func(text, blogger_name, **kwargs)
+        return synthesize_func(text, soul_name, **kwargs)
 
     # 检查是否有可用的表情库
-    stats = get_library_stats(blogger_name)
+    stats = get_library_stats(soul_name)
     has_library = any(count > 0 for count in stats.values())
 
     if not has_library:
         # 没有表情库，直接合成
         logger.info("没有表情库，跳过表情插入")
-        return synthesize_func(text, blogger_name, **kwargs)
+        return synthesize_func(text, soul_name, **kwargs)
 
     # 分割文本并合成
     segments = []
@@ -546,7 +546,7 @@ def synthesize_with_expressions(
                 segments.append(("text", normal_text))
 
         # 表情
-        clip = get_random_expression(blogger_name, expr_type)
+        clip = get_random_expression(soul_name, expr_type)
         if clip:
             segments.append(("expression", clip))
         else:
@@ -569,7 +569,7 @@ def synthesize_with_expressions(
         for seg_type, content in segments:
             if seg_type == "text":
                 # TTS 合成
-                result = synthesize_func(content, blogger_name, **kwargs)
+                result = synthesize_func(content, soul_name, **kwargs)
                 if result.get("success") and result.get("audio_base64"):
                     import base64
                     audio_bytes = base64.b64decode(result["audio_base64"])
@@ -595,7 +595,7 @@ def synthesize_with_expressions(
             return {
                 "success": True,
                 "text": text,
-                "blogger_name": blogger_name,
+                "soul_name": soul_name,
                 "duration_seconds": round(len(combined_audio) / 1000, 2),
                 "format": "wav",
                 "sample_rate": sample_rate,
@@ -604,11 +604,11 @@ def synthesize_with_expressions(
                 "expressions_used": len([s for s in segments if s[0] == "expression"]),
             }
         else:
-            return synthesize_func(text, blogger_name, **kwargs)
+            return synthesize_func(text, soul_name, **kwargs)
 
     except Exception as e:
         logger.error(f"表情合成失败: {e}")
         import traceback
         traceback.print_exc()
         # 回退到普通合成
-        return synthesize_func(text, blogger_name, **kwargs)
+        return synthesize_func(text, soul_name, **kwargs)

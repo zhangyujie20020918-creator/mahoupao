@@ -8,21 +8,25 @@ class SoulState(TypedDict):
 
     # 输入
     user_id: str
-    blogger_name: str
+    soul_name: str
     user_message: str
     model: str
 
     # 用户信息
     user_name: str
+    is_anonymous: bool
+    is_registered: bool
+    user_preferences: Dict
+    turn_count: int
 
     # 分析结果
     intent: Literal["greeting", "question", "recall", "chat", "farewell"]
-    needs_blogger_knowledge: bool
+    needs_soul_knowledge: bool
     needs_memory_recall: bool
     memory_keywords: List[str]
 
     # 检索结果
-    blogger_context: List[Dict]
+    soul_context: List[Dict]
     memory_context: Optional[str]
     detailed_history: Optional[str]
     needs_detailed_history: bool

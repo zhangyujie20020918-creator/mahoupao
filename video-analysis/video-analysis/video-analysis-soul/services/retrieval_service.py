@@ -30,7 +30,7 @@ class RetrievalService:
         top_k: Optional[int] = None,
     ) -> List[Dict]:
         """
-        搜索博主知识库
+        搜索知识库
 
         Returns:
             List[Dict] 每项包含 text, distance, metadata, context_before, context_after

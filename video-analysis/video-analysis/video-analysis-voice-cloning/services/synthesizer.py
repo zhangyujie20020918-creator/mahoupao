@@ -48,7 +48,7 @@ class VoiceSynthesizer:
     """语音合成器 - 使用 GPT-SoVITS TTS 类"""
 
     def __init__(self):
-        self.loaded_blogger: Optional[str] = None
+        self.loaded_soul: Optional[str] = None
         self.gpt_model_path: Optional[str] = None
         self.sovits_model_path: Optional[str] = None
         self.ref_audio_path: Optional[str] = None
@@ -111,17 +111,17 @@ class VoiceSynthesizer:
             traceback.print_exc()
             return None
 
-    def load_model(self, blogger_name: str) -> bool:
+    def load_model(self, soul_name: str) -> bool:
         """
-        加载博主的模型
+        加载的模型
 
         Args:
-            blogger_name: 博主名称
+            soul_name: 名称
 
         Returns:
             是否加载成功
         """
-        model_dir = config.TRAINED_DIR / blogger_name
+        model_dir = config.TRAINED_DIR / soul_name
         gpt_path = model_dir / "gpt.ckpt"
         sovits_path = model_dir / "sovits.pth"
 
@@ -138,8 +138,8 @@ class VoiceSynthesizer:
             self.ref_text = None
 
             # 查找参考音频 (从数据集中获取时长合适的)
-            dataset_dir = config.DATASETS_DIR / blogger_name
-            list_file = dataset_dir / f"{blogger_name}.list"
+            dataset_dir = config.DATASETS_DIR / soul_name
+            list_file = dataset_dir / f"{soul_name}.list"
 
             if list_file.exists():
                 with open(list_file, "r", encoding="utf-8") as f:
@@ -171,7 +171,7 @@ class VoiceSynthesizer:
 
             # 如果没有找到参考音频,从 downloads 目录找
             if not self.ref_audio_path:
-                downloads_dir = config.DOWNLOADS_DIR / blogger_name
+                downloads_dir = config.DOWNLOADS_DIR / soul_name
                 mp3_files = list(downloads_dir.glob("*.mp3"))
                 if mp3_files:
                     self.ref_audio_path = str(mp3_files[0])
@@ -183,12 +183,12 @@ class VoiceSynthesizer:
 
             self.gpt_model_path = str(gpt_path)
             self.sovits_model_path = str(sovits_path)
-            self.loaded_blogger = blogger_name
+            self.loaded_soul = soul_name
 
             # 重置 TTS 实例以便使用新模型
             self._tts_instance = None
 
-            logger.info(f"加载模型完成: {blogger_name}")
+            logger.info(f"加载模型完成: {soul_name}")
             return True
 
         except Exception as e:
@@ -198,7 +198,7 @@ class VoiceSynthesizer:
     def synthesize(
         self,
         text: str,
-        blogger_name: str,
+        soul_name: str,
         ref_audio: Optional[str] = None,
         speed: float = 1.0,
         output_format: str = "wav",
@@ -209,7 +209,7 @@ class VoiceSynthesizer:
 
         Args:
             text: 要合成的文本
-            blogger_name: 博主名称
+            soul_name: 名称
             ref_audio: 参考音频路径 (可选)
             speed: 语速 (0.5 - 2.0)
             output_format: 输出格式 (wav/mp3)
@@ -219,17 +219,17 @@ class VoiceSynthesizer:
             包含音频数据的字典
         """
         # 检查并加载模型（每次都强制重新加载以确保使用最新的参考音频选择逻辑）
-        if not self.load_model(blogger_name):
+        if not self.load_model(soul_name):
             return {
                 "success": False,
-                "error": f"无法加载 {blogger_name} 的模型",
+                "error": f"无法加载 {soul_name} 的模型",
             }
 
         # 如果指定了情绪，尝试获取对应情绪的参考音频
         if emotion and not ref_audio:
             try:
                 from services.emotion_manager import get_audio_by_emotion
-                emotion_audio = get_audio_by_emotion(blogger_name, emotion)
+                emotion_audio = get_audio_by_emotion(soul_name, emotion)
                 if emotion_audio:
                     ref_audio = emotion_audio["path"]
                     self.ref_text = emotion_audio["text"]
@@ -253,7 +253,7 @@ class VoiceSynthesizer:
             tts = self._get_tts_instance()
             if tts is None:
                 logger.warning("TTS 实例创建失败，使用模拟模式")
-                return self._synthesize_mock(text, blogger_name, speed)
+                return self._synthesize_mock(text, soul_name, speed)
 
             # 使用参考音频和文本
             ref_wav = ref_audio or self.ref_audio_path
@@ -318,7 +318,7 @@ class VoiceSynthesizer:
             return {
                 "success": True,
                 "text": text,
-                "blogger_name": blogger_name,
+                "soul_name": soul_name,
                 "speed": speed,
                 "duration_seconds": round(duration, 2),
                 "elapsed_seconds": round(elapsed, 3),
@@ -333,7 +333,7 @@ class VoiceSynthesizer:
             import traceback
             traceback.print_exc()
             # 回退到模拟模式
-            return self._synthesize_mock(text, blogger_name, speed)
+            return self._synthesize_mock(text, soul_name, speed)
 
         except Exception as e:
             logger.error(f"合成失败: {e}")
@@ -347,7 +347,7 @@ class VoiceSynthesizer:
     def _synthesize_mock(
         self,
         text: str,
-        blogger_name: str,
+        soul_name: str,
         speed: float,
     ) -> Dict[str, Any]:
         """模拟合成 (当 GPT-SoVITS 不可用时)"""
@@ -387,7 +387,7 @@ class VoiceSynthesizer:
         return {
             "success": True,
             "text": text,
-            "blogger_name": blogger_name,
+            "soul_name": soul_name,
             "speed": speed,
             "duration_seconds": round(duration, 2),
             "elapsed_seconds": round(elapsed, 3),
@@ -402,7 +402,7 @@ class VoiceSynthesizer:
     def get_status(self) -> Dict[str, Any]:
         """获取合成器状态"""
         return {
-            "loaded_blogger": self.loaded_blogger,
+            "loaded_soul": self.loaded_soul,
             "model_loaded": self.gpt_model_path is not None and self.sovits_model_path is not None,
             "gpt_model": self.gpt_model_path,
             "sovits_model": self.sovits_model_path,
@@ -425,7 +425,7 @@ def get_synthesizer() -> VoiceSynthesizer:
 
 def synthesize_voice(
     text: str,
-    blogger_name: str,
+    soul_name: str,
     speed: float = 1.0,
     emotion: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -434,7 +434,7 @@ def synthesize_voice(
 
     Args:
         text: 要合成的文本
-        blogger_name: 博主名称
+        soul_name: 名称
         speed: 语速
         emotion: 情绪类型
 
@@ -442,4 +442,4 @@ def synthesize_voice(
         合成结果
     """
     synthesizer = get_synthesizer()
-    return synthesizer.synthesize(text, blogger_name, speed=speed, emotion=emotion)
+    return synthesizer.synthesize(text, soul_name, speed=speed, emotion=emotion)

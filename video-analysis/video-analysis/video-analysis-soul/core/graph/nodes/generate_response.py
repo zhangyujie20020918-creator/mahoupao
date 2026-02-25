@@ -13,10 +13,10 @@ async def generate_response(state: SoulState, **deps) -> dict:
     generation_service = deps.get("generation_service")
     retrieval_service = deps.get("retrieval_service")
 
-    # 格式化博主知识上下文
-    blogger_context_str = None
-    if state.get("blogger_context"):
-        blogger_context_str = retrieval_service.format_context(state["blogger_context"])
+    # 格式化知识上下文
+    soul_context_str = None
+    if state.get("soul_context"):
+        soul_context_str = retrieval_service.format_context(state["soul_context"])
 
     # 格式化记忆上下文
     memory_context = state.get("memory_context")
@@ -43,7 +43,7 @@ async def generate_response(state: SoulState, **deps) -> dict:
         model=state.get("model"),
         today_messages=state.get("today_messages", []),
         preview_summary=preview_str,
-        blogger_context=blogger_context_str,
+        soul_context=soul_context_str,
         memory_context=memory_context,
         user_name=state.get("user_name"),
     )

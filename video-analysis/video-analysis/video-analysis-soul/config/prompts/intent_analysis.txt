@@ -8,14 +8,14 @@
 - farewell: 告别（再见、拜拜等）
 
 判断规则：
-1. 如果用户提到专业领域问题，需要博主的专业知识来回答 → needs_blogger_knowledge = true
+1. 如果用户提到专业领域问题，需要博主的专业知识来回答 → needs_soul_knowledge = true
 2. 如果用户提到过去的对话、之前说过的话 → needs_memory_recall = true
 3. 如果需要记忆检索，提取相关的关键词 → memory_keywords
 
 请返回 JSON 格式：
 {
     "intent": "意图类型",
-    "needs_blogger_knowledge": true/false,
+    "needs_soul_knowledge": true/false,
     "needs_memory_recall": true/false,
     "memory_keywords": ["关键词1", "关键词2"],
     "confidence": 0.0-1.0

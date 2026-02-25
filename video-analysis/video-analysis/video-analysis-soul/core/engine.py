@@ -17,6 +17,7 @@ from services.embedding_service import EmbeddingService
 from services.generation_service import GenerationService
 from services.llm_service import LLMService
 from services.retrieval_service import RetrievalService
+from storage.repositories.preferences_repository import PreferencesRepository
 
 logger = get_logger(__name__)
 
@@ -33,6 +34,7 @@ class SoulEngine:
         self.persona_manager = PersonaManager(self.embedding_service)
         self.user_manager = UserManager()
         self.memory_manager = MemoryManager()
+        self.preferences_repo = PreferencesRepository()
         self.cache_manager = SessionCacheManager()
         self.session_manager = SessionManager(self.cache_manager)
 
@@ -61,6 +63,7 @@ class SoulEngine:
             "persona_manager": self.persona_manager,
             "user_manager": self.user_manager,
             "memory_manager": self.memory_manager,
+            "preferences_repo": self.preferences_repo,
             "retrieval_service": self.retrieval_service,
             "analysis_service": self.analysis_service,
             "generation_service": self.generation_service,
@@ -80,7 +83,7 @@ class SoulEngine:
     async def chat(
         self,
         user_id: str,
-        blogger_name: str,
+        soul_name: str,
         message: str,
         model: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -98,15 +101,19 @@ class SoulEngine:
         # 构建初始状态
         initial_state: SoulState = {
             "user_id": user_id,
-            "blogger_name": blogger_name,
+            "soul_name": soul_name,
             "user_message": message,
             "model": model or settings.llm.default_model,
             "user_name": "",
+            "is_anonymous": False,
+            "is_registered": False,
+            "user_preferences": {},
+            "turn_count": 0,
             "intent": "chat",
-            "needs_blogger_knowledge": False,
+            "needs_soul_knowledge": False,
             "needs_memory_recall": False,
             "memory_keywords": [],
-            "blogger_context": [],
+            "soul_context": [],
             "memory_context": None,
             "detailed_history": None,
             "needs_detailed_history": False,
@@ -130,7 +137,7 @@ class SoulEngine:
     async def chat_stream(
         self,
         user_id: str,
-        blogger_name: str,
+        soul_name: str,
         message: str,
         model: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
@@ -143,7 +150,7 @@ class SoulEngine:
 
         # 非流式运行工作流获取上下文，然后流式生成回复
         # TODO: 实现完整的流式工作流
-        result = await self.chat(user_id, blogger_name, message, model)
+        result = await self.chat(user_id, soul_name, message, model)
 
         # 模拟流式输出
         response = result.get("response", "")

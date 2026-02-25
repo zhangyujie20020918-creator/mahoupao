@@ -50,7 +50,7 @@ class AnalysisService:
         返回:
         {
             "intent": "greeting" | "question" | "recall" | "chat" | "farewell",
-            "needs_blogger_knowledge": bool,
+            "needs_soul_knowledge": bool,
             "needs_memory_recall": bool,
             "memory_keywords": list[str],
             "confidence": float
@@ -148,7 +148,7 @@ class AnalysisService:
 
         return {
             "intent": intent,
-            "needs_blogger_knowledge": intent == "question",
+            "needs_soul_knowledge": intent == "question",
             "needs_memory_recall": intent == "recall",
             "memory_keywords": [],
             "confidence": 0.6,
@@ -159,7 +159,7 @@ class AnalysisService:
 
 可能的意图类型：
 - greeting: 打招呼
-- question: 专业问题（需要博主知识库）
+- question: 专业问题（需要知识库）
 - recall: 提及过去的事情（需要记忆检索）
 - chat: 日常闲聊
 - farewell: 告别
@@ -167,7 +167,7 @@ class AnalysisService:
 请返回 JSON 格式：
 {
     "intent": "意图类型",
-    "needs_blogger_knowledge": true/false,
+    "needs_soul_knowledge": true/false,
     "needs_memory_recall": true/false,
     "memory_keywords": ["关键词1", "关键词2"],
     "confidence": 0.0-1.0

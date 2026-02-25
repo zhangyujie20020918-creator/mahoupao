@@ -8,9 +8,9 @@ from api.schemas.persona import PersonaListResponse, PersonaResponse
 router = APIRouter()
 
 
-@router.get("/bloggers")
-async def list_bloggers(request: Request) -> BaseResponse:
-    """可用博主列表"""
+@router.get("/souls")
+async def list_souls(request: Request) -> BaseResponse:
+    """可用列表"""
     engine = request.app.state.engine
     personas = engine.persona_manager.list_available_personas()
     return BaseResponse(
@@ -20,9 +20,9 @@ async def list_bloggers(request: Request) -> BaseResponse:
     )
 
 
-@router.get("/bloggers/{name}")
-async def get_blogger(name: str, request: Request) -> BaseResponse:
-    """获取博主详情"""
+@router.get("/souls/{name}")
+async def get_soul(name: str, request: Request) -> BaseResponse:
+    """获取详情"""
     engine = request.app.state.engine
     try:
         persona = engine.persona_manager.load_persona(name)

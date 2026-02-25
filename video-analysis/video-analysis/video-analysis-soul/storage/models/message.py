@@ -32,6 +32,6 @@ class DailyConversation(BaseModel):
 
     date: str
     user_id: str
-    blogger: str
+    soul: str
     messages: List[Message] = []
     message_count: int = 0

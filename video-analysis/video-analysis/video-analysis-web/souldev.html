@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Soul Dev Dashboard</title>
+    <style>
+      :root {
+        --primary-color: #06b6d4;
+        --primary-hover: #0891b2;
+        --bg-color: #1a1a1a;
+        --card-bg: #242424;
+        --text-color: rgba(255, 255, 255, 0.87);
+        --text-muted: rgba(255, 255, 255, 0.6);
+        --border-color: rgba(255, 255, 255, 0.1);
+        --success-color: #10b981;
+        --warning-color: #f59e0b;
+        --error-color: #ef4444;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        min-height: 100vh;
+      }
+
+      /* ===== Header ===== */
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        background: var(--card-bg);
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+
+      .title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--primary-color), #22d3ee);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .status-badge {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.3rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        background: var(--bg-color);
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+
+      .status-dot.online { background: var(--success-color); }
+      .status-dot.offline { background: var(--error-color); }
+
+      .nav-link {
+        color: var(--text-muted);
+        text-decoration: none;
+        padding: 0.4rem 0.75rem;
+        border-radius: 6px;
+        transition: all 0.2s;
+        font-size: 0.85rem;
+      }
+
+      .nav-link:hover { background: var(--bg-color); color: var(--text-color); }
+
+      /* ===== Tabs ===== */
+      .tabs {
+        display: flex;
+        gap: 0;
+        background: var(--card-bg);
+        border-bottom: 1px solid var(--border-color);
+        padding: 0 1.5rem;
+        overflow-x: auto;
+      }
+
+      .tab {
+        padding: 0.75rem 1.25rem;
+        border: none;
+        background: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+        white-space: nowrap;
+      }
+
+      .tab:hover { color: var(--text-color); }
+
+      .tab.active {
+        color: var(--primary-color);
+        border-bottom-color: var(--primary-color);
+      }
+
+      /* ===== Content Area ===== */
+      .content {
+        padding: 1.5rem;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .card {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border: 1px solid var(--border-color);
+      }
+
+      .card-title {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: var(--text-muted);
+      }
+
+      /* ===== Form Elements ===== */
+      .form-group {
+        margin-bottom: 1rem;
+      }
+
+      .form-label {
+        display: block;
+        margin-bottom: 0.4rem;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+      }
+
+      .form-input, .form-select {
+        width: 100%;
+        padding: 0.6rem 0.75rem;
+        background: var(--bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-color);
+        font-size: 0.9rem;
+        transition: border-color 0.2s;
+      }
+
+      .form-input:focus, .form-select:focus {
+        outline: none;
+        border-color: var(--primary-color);
+      }
+
+      .form-row {
+        display: flex;
+        gap: 1rem;
+        align-items: flex-end;
+      }
+
+      .form-row > * { flex: 1; }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.6rem 1.25rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        gap: 0.4rem;
+      }
+
+      .btn-primary { background: var(--primary-color); color: white; }
+      .btn-danger { background: var(--error-color); color: white; }
+      .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
+      .btn:hover:not(:disabled) { filter: brightness(1.1); }
+      .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+      /* ===== Table ===== */
+      .table-container {
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th, td {
+        padding: 0.6rem 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+      }
+
+      th {
+        color: var(--text-muted);
+        font-weight: 600;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+
+      /* ===== Status Grid ===== */
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+      }
+
+      .stat-card {
+        background: var(--bg-color);
+        border-radius: 8px;
+        padding: 1rem;
+      }
+
+      .stat-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 0.4rem;
+      }
+
+      .stat-value {
+        font-size: 1.25rem;
+        font-weight: 700;
+      }
+
+      /* ===== Soul Cards ===== */
+      .soul-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+      }
+
+      .soul-card {
+        background: var(--bg-color);
+        border-radius: 8px;
+        padding: 1rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 2px solid transparent;
+      }
+
+      .soul-card:hover { border-color: var(--primary-color); }
+      .soul-card.selected { border-color: var(--primary-color); background: rgba(6, 182, 212, 0.1); }
+
+      .soul-name { font-weight: 600; font-size: 1rem; margin-bottom: 0.4rem; }
+
+      .soul-badges {
+        display: flex;
+        gap: 0.4rem;
+      }
+
+      .badge {
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 500;
+      }
+
+      .badge-kb { background: var(--success-color); color: white; }
+      .badge-persona { background: var(--primary-color); color: white; }
+
+      /* ===== Soul Detail ===== */
+      .detail-section {
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .detail-section:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+
+      .detail-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 0.4rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .detail-value {
+        font-size: 0.9rem;
+        line-height: 1.6;
+        white-space: pre-wrap;
+      }
+
+      .tag-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+      }
+
+      .tag {
+        padding: 0.2rem 0.6rem;
+        background: var(--card-bg);
+        border-radius: 16px;
+        font-size: 0.8rem;
+      }
+
+      /* ===== Chat Test ===== */
+      .chat-test-layout {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 1rem;
+        min-height: 400px;
+      }
+
+      @media (max-width: 768px) {
+        .chat-test-layout { grid-template-columns: 1fr; }
+      }
+
+      .chat-config .form-group { margin-bottom: 0.75rem; }
+
+      .chat-panel {
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-color);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .chat-messages-area {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        min-height: 300px;
+        max-height: 400px;
+      }
+
+      .chat-msg {
+        max-width: 80%;
+        padding: 0.5rem 0.75rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        line-height: 1.5;
+        word-break: break-word;
+        white-space: pre-wrap;
+      }
+
+      .chat-msg-user {
+        align-self: flex-end;
+        background: var(--primary-color);
+        color: white;
+      }
+
+      .chat-msg-assistant {
+        align-self: flex-start;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+      }
+
+      .chat-input-row {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.75rem;
+        border-top: 1px solid var(--border-color);
+      }
+
+      .chat-input-row input {
+        flex: 1;
+        padding: 0.5rem 0.75rem;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-color);
+        font-size: 0.85rem;
+      }
+
+      .chat-input-row input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+      }
+
+      /* ===== SSE Event Log ===== */
+      .sse-log {
+        max-height: 200px;
+        overflow-y: auto;
+        background: var(--bg-color);
+        border-radius: 8px;
+        padding: 0.75rem;
+        font-family: monospace;
+        font-size: 0.75rem;
+        margin-top: 1rem;
+      }
+
+      .sse-entry {
+        padding: 0.2rem 0;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        gap: 0.5rem;
+      }
+
+      .sse-entry:last-child { border-bottom: none; }
+
+      .sse-time { color: var(--text-muted); white-space: nowrap; }
+      .sse-type { color: var(--primary-color); font-weight: 600; min-width: 70px; }
+      .sse-data { color: var(--text-color); word-break: break-all; flex: 1; }
+
+      /* ===== Debug Info ===== */
+      .debug-panel {
+        margin-top: 1rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+        padding: 1rem;
+      }
+
+      .debug-panel pre {
+        font-size: 0.8rem;
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+
+      /* ===== Request Log Panel ===== */
+      .log-panel {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--card-bg);
+        border-top: 1px solid var(--border-color);
+        transition: transform 0.3s;
+        z-index: 50;
+      }
+
+      .log-panel.collapsed {
+        transform: translateY(calc(100% - 36px));
+      }
+
+      .log-panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        background: var(--card-bg);
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .log-panel-body {
+        max-height: 250px;
+        overflow-y: auto;
+        padding: 0;
+      }
+
+      .log-entry {
+        display: grid;
+        grid-template-columns: 80px 60px 1fr 60px 60px;
+        gap: 0.5rem;
+        padding: 0.4rem 1rem;
+        font-size: 0.75rem;
+        font-family: monospace;
+        border-bottom: 1px solid var(--border-color);
+        align-items: center;
+      }
+
+      .log-entry:hover { background: var(--bg-color); }
+      .log-method { font-weight: 600; }
+      .log-url { word-break: break-all; }
+      .log-status-ok { color: var(--success-color); }
+      .log-status-err { color: var(--error-color); }
+      .log-duration { color: var(--text-muted); }
+
+      /* ===== History Messages ===== */
+      .history-message {
+        padding: 0.75rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+      }
+
+      .history-message-header {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 0.3rem;
+        font-size: 0.8rem;
+      }
+
+      .history-role {
+        font-weight: 600;
+        min-width: 50px;
+      }
+
+      .history-role-human { color: var(--primary-color); }
+      .history-role-ai { color: var(--success-color); }
+
+      .history-time { color: var(--text-muted); }
+
+      .history-content {
+        font-size: 0.85rem;
+        line-height: 1.5;
+        white-space: pre-wrap;
+      }
+
+      .spinner {
+        width: 14px;
+        height: 14px;
+        border: 2px solid var(--border-color);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        display: inline-block;
+      }
+
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      .empty-state {
+        text-align: center;
+        padding: 2rem;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+      }
+
+      /* Bottom padding for log panel */
+      .content { padding-bottom: 4rem; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Header -->
+      <div class="header">
+        <div class="header-left">
+          <span class="title">Soul Dev Dashboard</span>
+          <div class="status-badge">
+            <span class="status-dot" :class="serverStatus ? 'online' : 'offline'"></span>
+            {{ serverStatus ? '在线' : '离线' }}
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <a href="soul.html" class="nav-link">返回对话</a>
+          <a href="index.html" class="nav-link">下载</a>
+          <a href="maker.html" class="nav-link">训练</a>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab" :class="{ active: activeTab === 'system' }" @click="activeTab = 'system'">系统</button>
+        <button class="tab" :class="{ active: activeTab === 'users' }" @click="activeTab = 'users'">用户管理</button>
+        <button class="tab" :class="{ active: activeTab === 'souls' }" @click="activeTab = 'souls'"></button>
+        <button class="tab" :class="{ active: activeTab === 'chat' }" @click="activeTab = 'chat'">对话测试</button>
+        <button class="tab" :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'">历史记录</button>
+      </div>
+
+      <!-- Content -->
+      <div class="content">
+
+        <!-- ==================== Tab: System ==================== -->
+        <div v-if="activeTab === 'system'">
+          <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <div class="card-title" style="margin-bottom: 0;">服务状态</div>
+              <button class="btn btn-primary btn-sm" @click="loadStatus">刷新</button>
+            </div>
+            <div v-if="statusData" class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-label">状态</div>
+                <div class="stat-value" style="color: var(--success-color);">{{ statusData.status || 'running' }}</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">活跃会话</div>
+                <div class="stat-value">{{ statusData.active_sessions || 0 }}</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">端口</div>
+                <div class="stat-value">{{ statusData.port || '-' }}</div>
+              </div>
+            </div>
+            <div v-else class="empty-state">加载中...</div>
+          </div>
+
+          <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <div class="card-title" style="margin-bottom: 0;">可用模型</div>
+              <button class="btn btn-primary btn-sm" @click="loadModels">刷新</button>
+            </div>
+            <div v-if="modelsData">
+              <div style="margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
+                默认模型: <strong style="color: var(--text-color);">{{ modelsData.default }}</strong>
+              </div>
+              <div class="tag-list">
+                <span v-for="m in modelsData.models" :key="m" class="tag">{{ m }}</span>
+              </div>
+            </div>
+            <div v-else class="empty-state">加载中...</div>
+          </div>
+        </div>
+
+        <!-- ==================== Tab: Users ==================== -->
+        <div v-if="activeTab === 'users'">
+          <div class="card">
+            <div class="card-title">创建用户</div>
+            <div class="form-row">
+              <div class="form-group" style="margin-bottom: 0;">
+                <input v-model="newUserName" class="form-input" placeholder="输入用户昵称..." @keydown.enter="createUser" />
+              </div>
+              <div style="flex: 0;">
+                <button class="btn btn-primary" :disabled="!newUserName.trim()" @click="createUser">创建</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <div class="card-title" style="margin-bottom: 0;">用户列表</div>
+              <button class="btn btn-primary btn-sm" @click="loadUsers">刷新</button>
+            </div>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>名称</th>
+                    <th>创建时间</th>
+                    <th>最后活跃</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-if="users.length === 0">
+                    <td colspan="5" style="text-align: center; color: var(--text-muted);">暂无用户</td>
+                  </tr>
+                  <tr v-for="u in users" :key="u.id">
+                    <td style="font-family: monospace; font-size: 0.75rem;">{{ u.id }}</td>
+                    <td>{{ u.name }}</td>
+                    <td style="font-size: 0.8rem; color: var(--text-muted);">{{ formatDateTime(u.created_at) }}</td>
+                    <td style="font-size: 0.8rem; color: var(--text-muted);">{{ formatDateTime(u.last_active) }}</td>
+                    <td>
+                      <button class="btn btn-danger btn-sm" @click="deleteUser(u.id, u.name)">删除</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== Tab: Souls ==================== -->
+        <div v-if="activeTab === 'souls'">
+          <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <div class="card-title" style="margin-bottom: 0;">列表</div>
+              <button class="btn btn-primary btn-sm" @click="loadSouls">刷新</button>
+            </div>
+            <div v-if="souls.length === 0" class="empty-state">暂无</div>
+            <div v-else class="soul-cards">
+              <div
+                v-for="b in souls"
+                :key="b.name"
+                class="soul-card"
+                :class="{ selected: selectedSoul === b.name }"
+                @click="selectSoul(b.name)"
+              >
+                <div class="soul-name">{{ b.name }}</div>
+                <div class="soul-badges">
+                  <span v-if="b.has_knowledge_base" class="badge badge-kb">知识库</span>
+                  <span v-if="b.has_system_prompt" class="badge badge-persona">人格</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Soul Detail -->
+          <div v-if="soulDetail" class="card">
+            <div class="card-title">{{ soulDetail.name }} 详情</div>
+            <div v-if="soulDetail.type" class="detail-section">
+              <div class="detail-label">类型</div>
+              <div class="detail-value">{{ soulDetail.type }}</div>
+            </div>
+            <div v-if="soulDetail.speaking_style" class="detail-section">
+              <div class="detail-label">说话风格</div>
+              <div class="detail-value">{{ soulDetail.speaking_style }}</div>
+            </div>
+            <div v-if="soulDetail.topic_expertise" class="detail-section">
+              <div class="detail-label">专业领域</div>
+              <div class="detail-value">{{ soulDetail.topic_expertise }}</div>
+            </div>
+            <div v-if="soulDetail.personality_traits" class="detail-section">
+              <div class="detail-label">性格特征</div>
+              <div class="detail-value">{{ soulDetail.personality_traits }}</div>
+            </div>
+            <div v-if="soulDetail.common_phrases" class="detail-section">
+              <div class="detail-label">常用语</div>
+              <div class="detail-value">{{ soulDetail.common_phrases }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== Tab: Chat Test ==================== -->
+        <div v-if="activeTab === 'chat'">
+          <div class="card">
+            <div class="card-title">对话测试</div>
+            <div class="chat-test-layout">
+              <!-- Config Panel -->
+              <div class="chat-config">
+                <div class="form-group">
+                  <label class="form-label">用户</label>
+                  <select v-model="chatUserId" class="form-select">
+                    <option value="" disabled>选择用户</option>
+                    <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }} ({{ u.id.substring(0, 8) }})</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label"></label>
+                  <select v-model="chatSoul" class="form-select">
+                    <option value="" disabled>选择</option>
+                    <option v-for="b in souls" :key="b.name" :value="b.name">{{ b.name }}</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">模型 (可选)</label>
+                  <select v-model="chatModel" class="form-select">
+                    <option value="">默认</option>
+                    <option v-for="m in (modelsData ? modelsData.models : [])" :key="m" :value="m">{{ m }}</option>
+                  </select>
+                </div>
+                <div v-if="chatDebugInfo" class="debug-panel">
+                  <div class="detail-label">Debug Info</div>
+                  <pre>{{ JSON.stringify(chatDebugInfo, null, 2) }}</pre>
+                </div>
+              </div>
+
+              <!-- Chat Panel -->
+              <div class="chat-panel">
+                <div class="chat-messages-area" ref="chatTestMessages">
+                  <div v-if="chatMessages.length === 0" class="empty-state">发送消息开始测试</div>
+                  <div
+                    v-for="(msg, i) in chatMessages"
+                    :key="i"
+                    class="chat-msg"
+                    :class="'chat-msg-' + msg.role"
+                  >{{ msg.content }}</div>
+                </div>
+                <div class="chat-input-row">
+                  <input
+                    v-model="chatInput"
+                    placeholder="输入测试消息..."
+                    :disabled="isChatting || !chatUserId || !chatSoul"
+                    @keydown.enter="sendTestChat"
+                  />
+                  <button class="btn btn-primary btn-sm" :disabled="isChatting || !chatInput.trim() || !chatUserId || !chatSoul" @click="sendTestChat">
+                    <span v-if="isChatting" class="spinner"></span>
+                    {{ isChatting ? '' : '发送' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- SSE Event Log -->
+            <div v-if="sseEvents.length > 0">
+              <div class="card-title" style="margin-top: 1rem;">SSE 事件日志</div>
+              <div class="sse-log">
+                <div v-for="(evt, i) in sseEvents" :key="i" class="sse-entry">
+                  <span class="sse-time">{{ evt.time }}</span>
+                  <span class="sse-type">{{ evt.type }}</span>
+                  <span class="sse-data">{{ evt.data }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== Tab: History ==================== -->
+        <div v-if="activeTab === 'history'">
+          <div class="card">
+            <div class="card-title">查询历史记录</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">用户</label>
+                <select v-model="historyUserId" class="form-select" @change="loadHistoryDates">
+                  <option value="" disabled>选择用户</option>
+                  <option v-for="u in users" :key="u.id" :value="u.id">{{ u.name }}</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label"></label>
+                <select v-model="historySoul" class="form-select" @change="loadHistoryDates">
+                  <option value="" disabled>选择</option>
+                  <option v-for="b in souls" :key="b.name" :value="b.name">{{ b.name }}</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">日期</label>
+                <select v-model="historyDate" class="form-select" @change="loadHistoryMessages">
+                  <option value="" disabled>选择日期</option>
+                  <option v-for="d in historyDates" :key="d" :value="d">{{ d }}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="historyMessages.length > 0" class="card">
+            <div class="card-title">对话记录 ({{ historyMessages.length }} 条)</div>
+            <div v-for="(msg, i) in historyMessages" :key="i" class="history-message">
+              <div class="history-message-header">
+                <span class="history-role" :class="'history-role-' + msg.role">{{ msg.role === 'human' ? '用户' : 'AI' }}</span>
+                <span class="history-time">{{ formatDateTime(msg.timestamp) }}</span>
+              </div>
+              <div class="history-content">{{ msg.content }}</div>
+              <div v-if="msg.sources && msg.sources.length > 0" style="margin-top: 0.5rem;">
+                <span style="font-size: 0.75rem; color: var(--text-muted);">来源: {{ msg.sources.join(', ') }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Request Log Panel -->
+      <div class="log-panel" :class="{ collapsed: !showLog }">
+        <div class="log-panel-header" @click="showLog = !showLog">
+          <span>请求日志 ({{ requestLog.length }})</span>
+          <span>{{ showLog ? '收起' : '展开' }}</span>
+        </div>
+        <div class="log-panel-body">
+          <div v-if="requestLog.length === 0" style="padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.8rem;">
+            暂无请求
+          </div>
+          <div v-for="(log, i) in requestLog" :key="i" class="log-entry">
+            <span class="sse-time">{{ log.time }}</span>
+            <span class="log-method">{{ log.method }}</span>
+            <span class="log-url">{{ log.url }}</span>
+            <span :class="log.status < 400 ? 'log-status-ok' : 'log-status-err'">{{ log.status }}</span>
+            <span class="log-duration">{{ log.duration }}ms</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script>
+      var API = 'http://localhost:8004/api/soul';
+
+      var app = Vue.createApp({
+        data: function() {
+          return {
+            activeTab: 'system',
+
+            // System
+            serverStatus: false,
+            statusData: null,
+            modelsData: null,
+
+            // Users
+            users: [],
+            newUserName: '',
+
+            // Souls
+            souls: [],
+            selectedSoul: null,
+            soulDetail: null,
+
+            // Chat
+            chatUserId: '',
+            chatSoul: '',
+            chatModel: '',
+            chatInput: '',
+            chatMessages: [],
+            sseEvents: [],
+            chatDebugInfo: null,
+            isChatting: false,
+
+            // History
+            historyUserId: '',
+            historySoul: '',
+            historyDates: [],
+            historyDate: '',
+            historyMessages: [],
+
+            // Log
+            requestLog: [],
+            showLog: true,
+          };
+        },
+        mounted: function() {
+          this.loadStatus();
+          this.loadModels();
+          this.loadUsers();
+          this.loadSouls();
+        },
+        methods: {
+          // ===== API helper with logging =====
+          apiCall: function(method, path, body) {
+            var vm = this;
+            var url = API + path;
+            var startTime = Date.now();
+
+            var opts = {
+              method: method,
+              headers: { 'Content-Type': 'application/json' },
+            };
+            if (body) opts.body = JSON.stringify(body);
+
+            return fetch(url, opts).then(function(response) {
+              var duration = Date.now() - startTime;
+              return response.json().then(function(data) {
+                vm.requestLog.unshift({
+                  time: vm.nowTime(),
+                  method: method,
+                  url: path,
+                  status: response.status,
+                  duration: duration,
+                });
+                // Keep log limited
+                if (vm.requestLog.length > 50) vm.requestLog.length = 50;
+                return { status: response.status, data: data };
+              });
+            }).catch(function(e) {
+              var duration = Date.now() - startTime;
+              vm.requestLog.unshift({
+                time: vm.nowTime(),
+                method: method,
+                url: path,
+                status: 0,
+                duration: duration,
+              });
+              throw e;
+            });
+          },
+
+          nowTime: function() {
+            var d = new Date();
+            return String(d.getHours()).padStart(2, '0') + ':' +
+                   String(d.getMinutes()).padStart(2, '0') + ':' +
+                   String(d.getSeconds()).padStart(2, '0');
+          },
+
+          formatDateTime: function(ts) {
+            if (!ts) return '-';
+            var d = new Date(ts);
+            if (isNaN(d.getTime())) return ts;
+            return d.getFullYear() + '-' +
+                   String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                   String(d.getDate()).padStart(2, '0') + ' ' +
+                   String(d.getHours()).padStart(2, '0') + ':' +
+                   String(d.getMinutes()).padStart(2, '0');
+          },
+
+          // ===== System =====
+          loadStatus: function() {
+            var vm = this;
+            vm.apiCall('GET', '/status')
+              .then(function(res) {
+                vm.serverStatus = true;
+                vm.statusData = res.data.data || res.data;
+              })
+              .catch(function() { vm.serverStatus = false; });
+          },
+
+          loadModels: function() {
+            var vm = this;
+            vm.apiCall('GET', '/models')
+              .then(function(res) {
+                vm.modelsData = res.data.data || res.data;
+              })
+              .catch(function() {});
+          },
+
+          // ===== Users =====
+          loadUsers: function() {
+            var vm = this;
+            vm.apiCall('GET', '/users')
+              .then(function(res) {
+                var d = res.data.data || res.data;
+                vm.users = d.users || [];
+              })
+              .catch(function() {});
+          },
+
+          createUser: function() {
+            var vm = this;
+            var name = vm.newUserName.trim();
+            if (!name) return;
+            vm.apiCall('POST', '/users', { name: name })
+              .then(function() {
+                vm.newUserName = '';
+                vm.loadUsers();
+              })
+              .catch(function() { alert('创建失败'); });
+          },
+
+          deleteUser: function(id, name) {
+            var vm = this;
+            if (!confirm('确定删除用户 "' + name + '"？')) return;
+            vm.apiCall('DELETE', '/users/' + id)
+              .then(function() { vm.loadUsers(); })
+              .catch(function() { alert('删除失败'); });
+          },
+
+          // ===== Souls =====
+          loadSouls: function() {
+            var vm = this;
+            vm.apiCall('GET', '/souls')
+              .then(function(res) {
+                var d = res.data.data || res.data;
+                vm.souls = d.personas || [];
+              })
+              .catch(function() {});
+          },
+
+          selectSoul: function(name) {
+            var vm = this;
+            vm.selectedSoul = name;
+            vm.soulDetail = null;
+            vm.apiCall('GET', '/souls/' + encodeURIComponent(name))
+              .then(function(res) {
+                vm.soulDetail = res.data.data || res.data;
+              })
+              .catch(function() {});
+          },
+
+          // ===== Chat Test =====
+          sendTestChat: function() {
+            var vm = this;
+            var text = vm.chatInput.trim();
+            if (!text || vm.isChatting || !vm.chatUserId || !vm.chatSoul) return;
+
+            vm.chatMessages.push({ role: 'user', content: text });
+            vm.chatMessages.push({ role: 'assistant', content: '' });
+            vm.chatInput = '';
+            vm.isChatting = true;
+            vm.chatDebugInfo = null;
+            vm.sseEvents = [];
+
+            var assistantIdx = vm.chatMessages.length - 1;
+            var startTime = Date.now();
+
+            var body = {
+              user_id: vm.chatUserId,
+              soul: vm.chatSoul,
+              message: text,
+            };
+            if (vm.chatModel) body.model = vm.chatModel;
+
+            // Log the request
+            vm.requestLog.unshift({
+              time: vm.nowTime(),
+              method: 'POST',
+              url: '/chat (SSE)',
+              status: '-',
+              duration: '-',
+            });
+
+            fetch(API + '/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            }).then(function(response) {
+              // Update log status
+              vm.requestLog[0].status = response.status;
+
+              var reader = response.body.getReader();
+              var decoder = new TextDecoder();
+              var buffer = '';
+
+              function processLines(text) {
+                buffer += text;
+                var lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                var currentEvent = '';
+                for (var i = 0; i < lines.length; i++) {
+                  var line = lines[i].trim();
+                  if (line.startsWith('event:')) {
+                    currentEvent = line.substring(6).trim();
+                  } else if (line.startsWith('data:')) {
+                    var dataStr = line.substring(5).trim();
+                    // Log SSE event
+                    vm.sseEvents.push({
+                      time: vm.nowTime(),
+                      type: currentEvent || 'data',
+                      data: dataStr,
+                    });
+
+                    try {
+                      var data = JSON.parse(dataStr);
+                      if (currentEvent === 'token') {
+                        vm.chatMessages[assistantIdx].content += (data.content || data.token || '');
+                        vm.scrollChatTest();
+                      } else if (currentEvent === 'thinking' || currentEvent === 'searching') {
+                        // Show in debug
+                      } else if (currentEvent === 'done') {
+                        vm.chatDebugInfo = data;
+                      } else if (currentEvent === 'error') {
+                        vm.chatMessages[assistantIdx].content = '错误: ' + (data.message || '未知');
+                      }
+                    } catch (e) {}
+                  }
+                }
+              }
+
+              function read() {
+                reader.read().then(function(result) {
+                  if (result.done) {
+                    if (buffer.trim()) processLines('\n');
+                    vm.isChatting = false;
+                    vm.requestLog[0].duration = (Date.now() - startTime);
+                    return;
+                  }
+                  processLines(decoder.decode(result.value, { stream: true }));
+                  read();
+                }).catch(function() {
+                  vm.isChatting = false;
+                });
+              }
+              read();
+            }).catch(function(e) {
+              vm.isChatting = false;
+              vm.chatMessages[assistantIdx].content = '请求失败: ' + e.message;
+            });
+          },
+
+          scrollChatTest: function() {
+            var vm = this;
+            vm.$nextTick(function() {
+              var el = vm.$refs.chatTestMessages;
+              if (el) el.scrollTop = el.scrollHeight;
+            });
+          },
+
+          // ===== History =====
+          loadHistoryDates: function() {
+            var vm = this;
+            if (!vm.historyUserId || !vm.historySoul) return;
+            vm.historyDates = [];
+            vm.historyDate = '';
+            vm.historyMessages = [];
+
+            vm.apiCall('GET', '/history/' + encodeURIComponent(vm.historyUserId) + '/' + encodeURIComponent(vm.historySoul))
+              .then(function(res) {
+                var d = res.data.data || res.data;
+                vm.historyDates = d.available_dates || [];
+                // Auto-add today if messages exist
+                if (d.today && d.today.messages && d.today.messages.length > 0) {
+                  var todayDate = d.today.date;
+                  if (todayDate && vm.historyDates.indexOf(todayDate) === -1) {
+                    vm.historyDates.unshift(todayDate);
+                  }
+                }
+              })
+              .catch(function() {});
+          },
+
+          loadHistoryMessages: function() {
+            var vm = this;
+            if (!vm.historyUserId || !vm.historySoul || !vm.historyDate) return;
+            vm.historyMessages = [];
+
+            vm.apiCall('GET', '/history/' + encodeURIComponent(vm.historyUserId) + '/' + encodeURIComponent(vm.historySoul) + '?date=' + vm.historyDate)
+              .then(function(res) {
+                var d = res.data.data || res.data;
+                vm.historyMessages = d.messages || [];
+              })
+              .catch(function() {});
+          },
+        },
+      });
+
+      app.mount('#app');
+    </script>
+  </body>
+</html>

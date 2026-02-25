@@ -27,13 +27,13 @@ async def analyze_message(state: SoulState, **deps) -> dict:
 
     logger.info(
         f"Intent analysis: intent={result.get('intent')}, "
-        f"knowledge={result.get('needs_blogger_knowledge')}, "
+        f"knowledge={result.get('needs_soul_knowledge')}, "
         f"memory={result.get('needs_memory_recall')}"
     )
 
     return {
         "intent": result.get("intent", "chat"),
-        "needs_blogger_knowledge": result.get("needs_blogger_knowledge", False),
+        "needs_soul_knowledge": result.get("needs_soul_knowledge", False),
         "needs_memory_recall": result.get("needs_memory_recall", False),
         "memory_keywords": result.get("memory_keywords", []),
         "debug_info": {

@@ -119,11 +119,11 @@ class PersonaManager:
         映射 maker 的 persona.json 字段到 soul 的 PersonaMetadata 字段
 
         maker persona.json 实际字段:
-        - blogger_name, speaking_style, common_phrases, topic_expertise,
+        - soul_name, speaking_style, common_phrases, topic_expertise,
         - personality_traits, tone, target_audience, content_patterns, system_prompt
         """
         field_mapping = {
-            "blogger_name": "persona_name",
+            "soul_name": "persona_name",
             "speaking_style": "speaking_style",
             "common_phrases": "common_phrases",
             "topic_expertise": "topic_expertise",

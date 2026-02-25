@@ -33,13 +33,13 @@ async def load_detail_history(state: SoulState, **deps) -> dict:
     for date_str in dates[:3]:
         conv = await memory_manager.get_conversation_by_date(
             user_id=state["user_id"],
-            persona_name=state["blogger_name"],
+            persona_name=state["soul_name"],
             date=date_str,
         )
         if conv and conv.messages:
             lines = [f"--- {date_str} 的对话 ---"]
             for msg in conv.messages[-10:]:  # 最近10条
-                role = "用户" if msg.role == "user" else "博主"
+                role = "用户" if msg.role == "user" else ""
                 lines.append(f"{role}: {msg.content}")
             detail_parts.append("\n".join(lines))
 

@@ -32,7 +32,7 @@ PYTHON_EXEC = sys.executable
 @dataclass
 class TrainConfig:
     """训练配置"""
-    blogger_name: str
+    soul_name: str
     exp_name: str
     epochs_gpt: int = 15
     epochs_sovits: int = 8
@@ -61,20 +61,20 @@ def get_ascii_safe_name(name: str) -> str:
     return f"exp_{hash_part}"
 
 
-def get_exp_dir(blogger_name: str) -> Path:
+def get_exp_dir(soul_name: str) -> Path:
     """获取实验目录"""
-    return config.DATASETS_DIR / blogger_name
+    return config.DATASETS_DIR / soul_name
 
 
-def get_list_file(blogger_name: str) -> Path:
+def get_list_file(soul_name: str) -> Path:
     """获取 .list 文件路径"""
-    return get_exp_dir(blogger_name) / f"{blogger_name}.list"
+    return get_exp_dir(soul_name) / f"{soul_name}.list"
 
 
-def check_training_data(blogger_name: str) -> Dict[str, Any]:
+def check_training_data(soul_name: str) -> Dict[str, Any]:
     """检查训练数据是否就绪"""
-    exp_dir = get_exp_dir(blogger_name)
-    list_file = get_list_file(blogger_name)
+    exp_dir = get_exp_dir(soul_name)
+    list_file = get_list_file(soul_name)
 
     result = {
         "ready": False,
@@ -194,7 +194,7 @@ def run_prepare_step(
 
 
 def prepare_training_data(
-    blogger_name: str,
+    soul_name: str,
 ) -> Generator[Dict[str, Any], None, bool]:
     """
     准备训练数据 (运行 GPT-SoVITS 的预处理脚本)
@@ -205,8 +205,8 @@ def prepare_training_data(
     """
     setup_environment()
 
-    exp_dir = get_exp_dir(blogger_name)
-    list_file = get_list_file(blogger_name)
+    exp_dir = get_exp_dir(soul_name)
+    list_file = get_list_file(soul_name)
 
     if not list_file.exists():
         yield {"type": "error", "message": f"训练数据文件不存在: {list_file}"}
@@ -235,7 +235,7 @@ def prepare_training_data(
     base_config = {
         "inp_text": str(list_file),
         "inp_wav_dir": str(audio_dir),
-        "exp_name": blogger_name,
+        "exp_name": soul_name,
         "opt_dir": str(exp_dir),
         "is_half": "True" if config.GPU_AVAILABLE else "False",
         "version": "v2",
@@ -370,7 +370,7 @@ def parse_training_output(line: str) -> Optional[Dict[str, Any]]:
 
 
 def train_gpt_model(
-    blogger_name: str,
+    soul_name: str,
     epochs: int = 15,
     batch_size: int = 4,
 ) -> Generator[Dict[str, Any], None, bool]:
@@ -379,12 +379,12 @@ def train_gpt_model(
     """
     setup_environment()
 
-    exp_dir = get_exp_dir(blogger_name)
+    exp_dir = get_exp_dir(soul_name)
     output_dir = exp_dir / "logs_s1"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # 使用 ASCII 安全的名称，避免 Windows 子进程编码问题
-    ascii_safe_name = get_ascii_safe_name(blogger_name)
+    ascii_safe_name = get_ascii_safe_name(soul_name)
 
     # 使用 ASCII 安全路径保存权重（在 BASE_DIR 下，避免中文路径）
     weights_dir = config.BASE_DIR / "weights_temp" / ascii_safe_name / "s1"
@@ -558,7 +558,7 @@ def train_gpt_model(
 
 
 def train_sovits_model(
-    blogger_name: str,
+    soul_name: str,
     epochs: int = 8,
     batch_size: int = 4,
 ) -> Generator[Dict[str, Any], None, bool]:
@@ -567,12 +567,12 @@ def train_sovits_model(
     """
     setup_environment()
 
-    exp_dir = get_exp_dir(blogger_name)
+    exp_dir = get_exp_dir(soul_name)
     output_dir = exp_dir / "logs_s2"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # 使用 ASCII 安全的名称，避免 Windows 子进程编码问题
-    ascii_safe_name = get_ascii_safe_name(blogger_name)
+    ascii_safe_name = get_ascii_safe_name(soul_name)
 
     # 使用 ASCII 安全路径保存检查点（在 BASE_DIR 下，避免中文路径）
     s2_ckpt_dir = config.BASE_DIR / "weights_temp" / ascii_safe_name / "s2"
@@ -722,7 +722,7 @@ def train_sovits_model(
 
 
 def full_training_pipeline(
-    blogger_name: str,
+    soul_name: str,
     epochs_gpt: int = 15,
     epochs_sovits: int = 8,
     batch_size: int = 4,
@@ -740,9 +740,9 @@ def full_training_pipeline(
 
     yield {
         "type": "start",
-        "message": f"开始训练 {blogger_name}",
+        "message": f"开始训练 {soul_name}",
         "config": {
-            "blogger_name": blogger_name,
+            "soul_name": soul_name,
             "epochs_gpt": epochs_gpt,
             "epochs_sovits": epochs_sovits,
             "batch_size": batch_size,
@@ -756,7 +756,7 @@ def full_training_pipeline(
         yield {"type": "phase", "phase": "prepare", "message": "数据预处理..."}
 
         success = False
-        for progress in prepare_training_data(blogger_name):
+        for progress in prepare_training_data(soul_name):
             yield progress
             if progress.get("type") == "error":
                 return
@@ -769,7 +769,7 @@ def full_training_pipeline(
 
     # Step 2: GPT 训练
     gpt_success = False
-    for progress in train_gpt_model(blogger_name, epochs_gpt, batch_size):
+    for progress in train_gpt_model(soul_name, epochs_gpt, batch_size):
         yield progress
         if progress.get("type") == "error":
             return
@@ -782,7 +782,7 @@ def full_training_pipeline(
 
     # Step 3: SoVITS 训练
     sovits_success = False
-    for progress in train_sovits_model(blogger_name, epochs_sovits, batch_size):
+    for progress in train_sovits_model(soul_name, epochs_sovits, batch_size):
         yield progress
         if progress.get("type") == "error":
             return
@@ -794,12 +794,12 @@ def full_training_pipeline(
         return
 
     # Step 4: 复制最终模型到 trained 目录
-    exp_dir = get_exp_dir(blogger_name)
-    output_dir = config.TRAINED_DIR / blogger_name
+    exp_dir = get_exp_dir(soul_name)
+    output_dir = config.TRAINED_DIR / soul_name
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # ASCII 安全路径下的模型
-    ascii_safe_name = get_ascii_safe_name(blogger_name)
+    ascii_safe_name = get_ascii_safe_name(soul_name)
     weights_temp_dir = config.BASE_DIR / "weights_temp" / ascii_safe_name
 
     import shutil

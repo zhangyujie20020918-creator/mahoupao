@@ -33,7 +33,7 @@ async def chat(body: ChatRequest, request: Request):
         try:
             async for event in engine.chat_stream(
                 user_id=body.user_id,
-                blogger_name=body.blogger,
+                soul_name=body.soul,
                 message=body.message,
                 model=body.model,
             ):
@@ -62,14 +62,14 @@ async def chat(body: ChatRequest, request: Request):
 
 @router.post("/preview/refresh")
 async def refresh_preview(
-    request: Request, user_id: str = None, blogger: str = None
+    request: Request, user_id: str = None, soul: str = None
 ) -> BaseResponse:
     """强制刷新 Preview"""
     engine = request.app.state.engine
 
-    if not user_id or not blogger:
+    if not user_id or not soul:
         raise HTTPException(
-            status_code=400, detail="user_id and blogger are required"
+            status_code=400, detail="user_id and soul are required"
         )
 
     # TODO: 触发 Preview 重新总结

@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     output_dir: Path = Field(default=None, env="OUTPUT_DIR")
 
     # ChromaDB
-    chroma_collection_prefix: str = "blogger_"
+    chroma_collection_prefix: str = "soul_"
 
     # Processing Settings
     batch_size: int = 5  # 每批处理的视频数量
@@ -48,11 +48,11 @@ class Settings(BaseSettings):
         # 确保输出目录存在
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-    def get_blogger_output_dir(self, blogger_name: str) -> Path:
-        """获取指定博主的输出目录"""
-        blogger_dir = self.output_dir / blogger_name
-        blogger_dir.mkdir(parents=True, exist_ok=True)
-        return blogger_dir
+    def get_soul_output_dir(self, soul_name: str) -> Path:
+        """获取指定的输出目录"""
+        soul_dir = self.output_dir / soul_name
+        soul_dir.mkdir(parents=True, exist_ok=True)
+        return soul_dir
 
 
 @lru_cache()

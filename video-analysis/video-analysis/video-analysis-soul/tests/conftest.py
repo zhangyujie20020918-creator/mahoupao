@@ -30,13 +30,13 @@ def mock_persona_manager():
 
     manager = MagicMock()
     manager.load_persona.return_value = PersonaMetadata(
-        persona_name="测试博主",
+        persona_name="测试",
         persona_type=PersonaType.INFLUENCER,
-        system_prompt="你是一个测试博主",
+        system_prompt="你是一个测试",
         common_phrases=["兄弟们！"],
     )
     manager.list_available_personas.return_value = [
-        {"name": "测试博主", "has_knowledge_base": True, "has_system_prompt": True, "video_count": 5}
+        {"name": "测试", "has_knowledge_base": True, "has_system_prompt": True, "video_count": 5}
     ]
     manager.search_knowledge.return_value = [
         SearchResult(
@@ -55,12 +55,42 @@ def mock_user_manager():
 
     manager = AsyncMock()
     manager.get_user.return_value = UserProfile(
-        id="test-user-id", name="测试用户"
+        id="test-user-id", name="测试用户",
+        is_anonymous=False, is_registered=True,
     )
     manager.list_users.return_value = [
-        UserProfile(id="test-user-id", name="测试用户")
+        UserProfile(id="test-user-id", name="测试用户",
+                    is_anonymous=False, is_registered=True)
     ]
     return manager
+
+
+@pytest.fixture
+def mock_anonymous_user_manager():
+    """Mock 匿名用户管理器"""
+    from storage.models.user import UserProfile
+
+    manager = AsyncMock()
+    manager.get_user.return_value = UserProfile(
+        id="anon-user-id", name="访客_abc123",
+        is_anonymous=True, is_registered=False,
+    )
+    return manager
+
+
+@pytest.fixture
+def mock_preferences_repo():
+    """Mock 偏好仓库"""
+    from storage.models.preferences import UserPreferences
+
+    repo = AsyncMock()
+    repo.get.return_value = UserPreferences(user_id="anon-user-id")
+    repo.merge_from_conversation.return_value = UserPreferences(
+        user_id="anon-user-id",
+        interests=["AI", "编程"],
+        collection_progress={"interests": True, "recent_topics": True},
+    )
+    return repo
 
 
 @pytest.fixture
@@ -68,9 +98,82 @@ def sample_chat_request():
     """示例对话请求"""
     return {
         "user_id": "test-user-id",
-        "blogger": "测试博主",
+        "soul": "测试",
         "message": "今天AI应用怎么看？",
         "model": "gemini-2.5-flash",
+    }
+
+
+@pytest.fixture
+def sample_soul_state():
+    """示例 SoulState（注册用户）"""
+    return {
+        "user_id": "test-user-id",
+        "soul_name": "测试",
+        "user_message": "今天AI应用怎么看？",
+        "model": "gemini-2.5-flash",
+        "user_name": "测试用户",
+        "is_anonymous": False,
+        "is_registered": True,
+        "user_preferences": {},
+        "turn_count": 0,
+        "intent": "chat",
+        "needs_soul_knowledge": False,
+        "needs_memory_recall": False,
+        "memory_keywords": [],
+        "soul_context": [],
+        "memory_context": None,
+        "detailed_history": None,
+        "needs_detailed_history": False,
+        "today_messages": [],
+        "preview_summary": {},
+        "system_prompt": "你是一个测试",
+        "response": "这是的原始回复",
+        "sources": [],
+        "debug_info": {},
+    }
+
+
+@pytest.fixture
+def sample_anonymous_state():
+    """示例 SoulState（匿名用户）"""
+    return {
+        "user_id": "anon-user-id",
+        "soul_name": "测试",
+        "user_message": "你好，我想了解AI",
+        "model": "gemini-2.5-flash",
+        "user_name": "访客_abc123",
+        "is_anonymous": True,
+        "is_registered": False,
+        "user_preferences": {
+            "user_id": "anon-user-id",
+            "interests": [],
+            "visit_motivation": None,
+            "personality_type": None,
+            "communication_style": None,
+            "recent_topics": [],
+            "mood_history": [],
+            "knowledge_level": {},
+            "collection_progress": {},
+        },
+        "turn_count": 2,
+        "intent": "chat",
+        "needs_soul_knowledge": False,
+        "needs_memory_recall": False,
+        "memory_keywords": [],
+        "soul_context": [],
+        "memory_context": None,
+        "detailed_history": None,
+        "needs_detailed_history": False,
+        "today_messages": [
+            {"role": "user", "content": "你好"},
+            {"role": "assistant", "content": "你好呀！"},
+        ],
+        "preview_summary": {},
+        "system_prompt": "你是一个测试",
+        "response": "AI技术发展非常迅速，目前在很多领域都有应用。",
+        "sources": [],
+        "debug_info": {},
     }
 
 

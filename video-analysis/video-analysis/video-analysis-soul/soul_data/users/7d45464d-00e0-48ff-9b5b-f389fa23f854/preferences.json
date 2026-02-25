@@ -1,0 +1,27 @@
+{
+  "user_id": "7d45464d-00e0-48ff-9b5b-f389fa23f854",
+  "last_updated": "2026-02-25T21:39:59.481700",
+  "interests": [
+    "AI的形象/外貌",
+    "AI本身"
+  ],
+  "visit_motivation": "与AI进行情感互动或了解其形象",
+  "personality_type": " playful/flirtatious",
+  "communication_style": "直接、非正式、寻求个人化互动",
+  "recent_topics": [
+    "AI的身份/形象",
+    "与AI的互动方式",
+    "AI的身份",
+    "用户与AI的关系",
+    "用户与AI的熟悉程度"
+  ],
+  "mood_history": [],
+  "knowledge_level": {},
+  "collection_progress": {
+    "communication_style": true,
+    "recent_topics": true,
+    "personality_type": true,
+    "visit_motivation": true,
+    "interests": true
+  }
+}

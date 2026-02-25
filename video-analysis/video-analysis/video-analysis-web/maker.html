@@ -78,9 +78,9 @@
         gap: 0.5rem;
       }
 
-      .blogger-list { display: grid; gap: 0.75rem; }
+      .soul-list { display: grid; gap: 0.75rem; }
 
-      .blogger-item {
+      .soul-item {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -92,12 +92,12 @@
         border: 2px solid transparent;
       }
 
-      .blogger-item:hover { border-color: var(--primary-color); }
-      .blogger-item.selected { border-color: var(--primary-color); background: rgba(139, 92, 246, 0.1); }
+      .soul-item:hover { border-color: var(--primary-color); }
+      .soul-item.selected { border-color: var(--primary-color); background: rgba(139, 92, 246, 0.1); }
 
-      .blogger-name { font-weight: 600; font-size: 1.05rem; }
+      .soul-name { font-weight: 600; font-size: 1.05rem; }
 
-      .blogger-stats {
+      .soul-stats {
         display: flex;
         gap: 1rem;
         font-size: 0.8rem;
@@ -299,6 +299,7 @@
             {{ serviceOnline ? '服务在线' : '服务离线' }}
           </span>
           <div class="nav-links">
+            <a href="soul.html" class="nav-link">智能对话</a>
             <a href="voice.html" class="nav-link">声音克隆</a>
             <a href="cleaner.html" class="nav-link">数据清洗</a>
             <a href="index.html" class="nav-link">返回下载</a>
@@ -347,26 +348,26 @@
           </div>
         </div>
 
-        <!-- 博主列表 -->
+        <!-- 列表 -->
         <div class="card">
-          <div class="card-title">选择博主</div>
-          <div v-if="bloggers.length === 0" class="empty-state">
-            <p>没有找到博主，请先下载视频并进行数据清洗</p>
+          <div class="card-title">选择</div>
+          <div v-if="souls.length === 0" class="empty-state">
+            <p>没有找到，请先下载视频并进行数据清洗</p>
           </div>
-          <div v-else class="blogger-list">
+          <div v-else class="soul-list">
             <div
-              v-for="blogger in bloggers"
-              :key="blogger.name"
-              class="blogger-item"
-              :class="{ selected: selectedBlogger === blogger.name }"
-              @click="selectBlogger(blogger.name)"
+              v-for="soul in souls"
+              :key="soul.name"
+              class="soul-item"
+              :class="{ selected: selectedSoul === soul.name }"
+              @click="selectSoul(soul.name)"
             >
               <div>
-                <div class="blogger-name">{{ blogger.name }}</div>
-                <div class="blogger-stats">
-                  <span><span class="badge badge-video">{{ blogger.video_count }}</span> 视频</span>
-                  <span><span class="badge badge-asr">{{ blogger.asr_count }}</span> ASR</span>
-                  <span v-if="blogger.trained">
+                <div class="soul-name">{{ soul.name }}</div>
+                <div class="soul-stats">
+                  <span><span class="badge badge-video">{{ soul.video_count }}</span> 视频</span>
+                  <span><span class="badge badge-asr">{{ soul.asr_count }}</span> ASR</span>
+                  <span v-if="soul.trained">
                     <span class="badge badge-trained">已训练</span>
                   </span>
                   <span v-else>
@@ -379,7 +380,7 @@
         </div>
 
         <!-- 训练选项 -->
-        <div v-if="selectedBlogger" class="card">
+        <div v-if="selectedSoul" class="card">
           <div class="card-title">训练选项</div>
 
           <div class="checkbox-group">
@@ -428,19 +429,19 @@
           </div>
 
           <!-- 训练结果 -->
-          <div v-if="trainingDone && bloggerDetail" class="progress-section">
+          <div v-if="trainingDone && soulDetail" class="progress-section">
             <div class="card-title" style="color: var(--success-color);">训练完成</div>
 
             <!-- 人格画像预览 -->
-            <div v-if="bloggerDetail.persona" class="persona-preview">
+            <div v-if="soulDetail.persona" class="persona-preview">
               <div class="persona-section">
                 <div class="persona-label">说话风格</div>
-                <div class="persona-value">{{ bloggerDetail.persona.speaking_style }}</div>
+                <div class="persona-value">{{ soulDetail.persona.speaking_style }}</div>
               </div>
               <div class="persona-section">
                 <div class="persona-label">常用语</div>
                 <div class="tag-list">
-                  <span v-for="phrase in bloggerDetail.persona.common_phrases" :key="phrase" class="tag">
+                  <span v-for="phrase in soulDetail.persona.common_phrases" :key="phrase" class="tag">
                     {{ phrase }}
                   </span>
                 </div>
@@ -448,7 +449,7 @@
               <div class="persona-section">
                 <div class="persona-label">专业领域</div>
                 <div class="tag-list">
-                  <span v-for="topic in bloggerDetail.persona.topic_expertise" :key="topic" class="tag">
+                  <span v-for="topic in soulDetail.persona.topic_expertise" :key="topic" class="tag">
                     {{ topic }}
                   </span>
                 </div>
@@ -456,16 +457,16 @@
             </div>
 
             <!-- System Prompt -->
-            <div v-if="bloggerDetail.system_prompt" style="margin-top: 1rem;">
+            <div v-if="soulDetail.system_prompt" style="margin-top: 1rem;">
               <div class="persona-label">System Prompt</div>
-              <div class="system-prompt">{{ bloggerDetail.system_prompt }}</div>
+              <div class="system-prompt">{{ soulDetail.system_prompt }}</div>
             </div>
 
             <!-- 向量数据库统计 -->
-            <div v-if="bloggerDetail.vectordb_stats" style="margin-top: 1rem;">
+            <div v-if="soulDetail.vectordb_stats" style="margin-top: 1rem;">
               <div class="persona-label">向量数据库</div>
               <div style="color: var(--text-muted);">
-                共 {{ bloggerDetail.vectordb_stats.document_count }} 条记录
+                共 {{ soulDetail.vectordb_stats.document_count }} 条记录
               </div>
             </div>
           </div>
@@ -482,8 +483,8 @@
           return {
             serviceOnline: false,
             statusInfo: {},
-            bloggers: [],
-            selectedBlogger: null,
+            souls: [],
+            selectedSoul: null,
 
             skipOptimization: false,
             skipVectordb: false,
@@ -492,7 +493,7 @@
             training: false,
             trainingDone: false,
             steps: [],
-            bloggerDetail: null,
+            soulDetail: null,
           };
         },
         mounted: function() {
@@ -506,39 +507,39 @@
               .then(function(data) {
                 vm.serviceOnline = true;
                 vm.statusInfo = data;
-                vm.loadBloggers();
+                vm.loadSouls();
               })
               .catch(function() {
                 vm.serviceOnline = false;
               });
           },
 
-          loadBloggers: function() {
+          loadSouls: function() {
             var vm = this;
-            fetch(API + '/bloggers')
+            fetch(API + '/souls')
               .then(function(r) { return r.json(); })
-              .then(function(data) { vm.bloggers = data.bloggers; });
+              .then(function(data) { vm.souls = data.souls; });
           },
 
-          selectBlogger: function(name) {
-            this.selectedBlogger = name;
+          selectSoul: function(name) {
+            this.selectedSoul = name;
             this.steps = [];
             this.trainingDone = false;
-            this.bloggerDetail = null;
+            this.soulDetail = null;
 
             // 如果已训练，加载详情
-            var blogger = this.bloggers.find(function(b) { return b.name === name; });
-            if (blogger && blogger.trained) {
-              this.loadBloggerDetail(name);
+            var soul = this.souls.find(function(b) { return b.name === name; });
+            if (soul && soul.trained) {
+              this.loadSoulDetail(name);
             }
           },
 
-          loadBloggerDetail: function(name) {
+          loadSoulDetail: function(name) {
             var vm = this;
-            fetch(API + '/blogger/' + encodeURIComponent(name))
+            fetch(API + '/soul/' + encodeURIComponent(name))
               .then(function(r) { return r.json(); })
               .then(function(data) {
-                vm.bloggerDetail = data;
+                vm.soulDetail = data;
                 vm.trainingDone = true;
               });
           },
@@ -547,7 +548,7 @@
             var vm = this;
             vm.training = true;
             vm.trainingDone = false;
-            vm.bloggerDetail = null;
+            vm.soulDetail = null;
             vm.steps = [
               { step: 1, title: '文本优化', message: '等待中...', status: '', progress: 0 },
               { step: 2, title: '向量数据库', message: '等待中...', status: '', progress: 0 },
@@ -558,7 +559,7 @@
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                blogger_name: vm.selectedBlogger,
+                soul_name: vm.selectedSoul,
                 skip_optimization: vm.skipOptimization,
                 skip_vectordb: vm.skipVectordb,
                 skip_persona: vm.skipPersona,
@@ -624,8 +625,8 @@
             } else if (data.type === 'done') {
               vm.training = false;
               vm.trainingDone = true;
-              vm.loadBloggers();
-              vm.loadBloggerDetail(vm.selectedBlogger);
+              vm.loadSouls();
+              vm.loadSoulDetail(vm.selectedSoul);
             }
           },
         },

@@ -24,7 +24,7 @@ async def memory_retrieval(state: SoulState, **deps) -> dict:
     try:
         matched_entries = await memory_manager.search_memory(
             user_id=state["user_id"],
-            persona_name=state["blogger_name"],
+            persona_name=state["soul_name"],
             keywords=keywords,
         )
 

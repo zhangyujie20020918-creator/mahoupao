@@ -7,9 +7,9 @@ from api.schemas.common import BaseResponse
 router = APIRouter()
 
 
-@router.get("/history/{user_id}/{blogger}")
+@router.get("/history/{user_id}/{soul}")
 async def get_history(
-    user_id: str, blogger: str, request: Request, date: str = None
+    user_id: str, soul: str, request: Request, date: str = None
 ) -> BaseResponse:
     """获取对话历史"""
     engine = request.app.state.engine
@@ -17,7 +17,7 @@ async def get_history(
     if date:
         # 获取指定日期
         conv = await engine.memory_manager.get_conversation_by_date(
-            user_id, blogger, date
+            user_id, soul, date
         )
         if not conv:
             return BaseResponse(data={"messages": [], "date": date})
@@ -30,8 +30,8 @@ async def get_history(
         )
     else:
         # 获取今日对话
-        conv = await engine.memory_manager.get_today_conversation(user_id, blogger)
-        dates = await engine.memory_manager.get_conversation_dates(user_id, blogger)
+        conv = await engine.memory_manager.get_today_conversation(user_id, soul)
+        dates = await engine.memory_manager.get_conversation_dates(user_id, soul)
         return BaseResponse(
             data={
                 "today": {

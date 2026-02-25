@@ -71,3 +71,13 @@ class SessionError(SoulBaseError):
 class ConfigError(SoulBaseError):
     """配置错误"""
     pass
+
+
+class VerificationError(SoulBaseError):
+    """验证失败"""
+    pass
+
+
+class RegistrationError(SoulBaseError):
+    """注册错误"""
+    pass

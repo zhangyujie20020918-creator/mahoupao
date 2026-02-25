@@ -20,10 +20,10 @@ async def update_memory(state: SoulState, **deps) -> dict:
     llm_service = deps.get("llm_service")
 
     user_id = state["user_id"]
-    blogger_name = state["blogger_name"]
+    soul_name = state["soul_name"]
 
     # 获取今日对话
-    conv = await memory_manager.get_today_conversation(user_id, blogger_name)
+    conv = await memory_manager.get_today_conversation(user_id, soul_name)
     trigger_count = settings.memory.preview.summary_trigger_messages
 
     # 检查是否需要总结
@@ -32,14 +32,14 @@ async def update_memory(state: SoulState, **deps) -> dict:
             f"Triggering preview summary: {conv.message_count} messages reached"
         )
         await _generate_preview_summary(
-            memory_manager, llm_service, user_id, blogger_name, conv.messages
+            memory_manager, llm_service, user_id, soul_name, conv.messages
         )
 
     return {}
 
 
 async def _generate_preview_summary(
-    memory_manager, llm_service, user_id, blogger_name, messages
+    memory_manager, llm_service, user_id, soul_name, messages
 ):
     """生成 Preview 总结"""
     from common.config import BASE_DIR
@@ -54,7 +54,7 @@ async def _generate_preview_summary(
 
     # 格式化对话内容
     conv_text = "\n".join(
-        f"{'用户' if m.role == 'user' else '博主'}: {m.content}"
+        f"{'用户' if m.role == 'user' else ''}: {m.content}"
         for m in messages[-20:]  # 最近20条
     )
 
@@ -69,14 +69,14 @@ async def _generate_preview_summary(
             result_text = match.group(1).strip()
         summary_data = json.loads(result_text)
         summary = MemorySummary(**summary_data)
-        await memory_manager.update_preview(user_id, blogger_name, summary)
-        logger.info(f"Preview summary updated for user={user_id}, persona={blogger_name}")
+        await memory_manager.update_preview(user_id, soul_name, summary)
+        logger.info(f"Preview summary updated for user={user_id}, persona={soul_name}")
     except Exception as e:
         logger.error(f"Preview summary failed: {e}")
 
 
 def _default_summary_prompt() -> str:
-    return """你是一个记忆助手，负责总结用户和博主的对话。
+    return """你是一个记忆助手，负责总结用户和的对话。
 
 请从以下对话中提取关键信息，格式如下：
 {

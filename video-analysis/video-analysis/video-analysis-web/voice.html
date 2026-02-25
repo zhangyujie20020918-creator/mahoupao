@@ -79,9 +79,9 @@
         gap: 0.5rem;
       }
 
-      .blogger-list { display: grid; gap: 0.75rem; }
+      .soul-list { display: grid; gap: 0.75rem; }
 
-      .blogger-item {
+      .soul-item {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -93,12 +93,12 @@
         border: 2px solid transparent;
       }
 
-      .blogger-item:hover { border-color: var(--primary-color); }
-      .blogger-item.selected { border-color: var(--primary-color); background: rgba(236, 72, 153, 0.1); }
+      .soul-item:hover { border-color: var(--primary-color); }
+      .soul-item.selected { border-color: var(--primary-color); background: rgba(236, 72, 153, 0.1); }
 
-      .blogger-name { font-weight: 600; font-size: 1.05rem; }
+      .soul-name { font-weight: 600; font-size: 1.05rem; }
 
-      .blogger-stats {
+      .soul-stats {
         display: flex;
         gap: 1rem;
         font-size: 0.8rem;
@@ -446,6 +446,7 @@
             <span class="status-dot" :class="serviceOnline ? 'online' : 'offline'"></span>
             {{ serviceOnline ? '服务在线' : '服务离线' }}
           </span>
+          <a href="soul.html" class="nav-link">智能对话</a>
           <a href="maker.html" class="nav-link">AI训练</a>
           <a href="cleaner.html" class="nav-link">数据清洗</a>
           <a href="index.html" class="nav-link">视频下载</a>
@@ -600,42 +601,42 @@
           </div>
         </div>
 
-        <!-- 博主选择 -->
+        <!-- 选择 -->
         <div class="card">
-          <div class="card-title">选择博主</div>
-          <div v-if="bloggers.length === 0" class="empty-state">
-            <p>没有找到博主数据，请先下载视频并清洗数据</p>
+          <div class="card-title">选择</div>
+          <div v-if="souls.length === 0" class="empty-state">
+            <p>没有找到数据，请先下载视频并清洗数据</p>
           </div>
-          <div v-else class="blogger-list">
+          <div v-else class="soul-list">
             <div
-              v-for="blogger in bloggers"
-              :key="blogger.name"
-              class="blogger-item"
-              :class="{ selected: selectedBlogger === blogger.name }"
-              @click="selectBlogger(blogger.name)"
+              v-for="soul in souls"
+              :key="soul.name"
+              class="soul-item"
+              :class="{ selected: selectedSoul === soul.name }"
+              @click="selectSoul(soul.name)"
             >
               <div>
-                <div class="blogger-name">{{ blogger.name }}</div>
-                <div class="blogger-stats">
-                  <span><span class="badge badge-source">{{ blogger.source.file_pairs }}</span> 音频文件</span>
-                  <span v-if="blogger.dataset.prepared">
-                    <span class="badge badge-dataset">{{ blogger.dataset.segments }}</span> 训练片段
+                <div class="soul-name">{{ soul.name }}</div>
+                <div class="soul-stats">
+                  <span><span class="badge badge-source">{{ soul.source.file_pairs }}</span> 音频文件</span>
+                  <span v-if="soul.dataset.prepared">
+                    <span class="badge badge-dataset">{{ soul.dataset.segments }}</span> 训练片段
                   </span>
-                  <span v-if="blogger.model.trained">
+                  <span v-if="soul.model.trained">
                     <span class="badge badge-ready">模型就绪</span>
                   </span>
                 </div>
               </div>
               <div style="display: flex; gap: 0.5rem;">
-                <span v-if="blogger.dataset.prepared" class="badge badge-dataset">数据已准备</span>
-                <span v-if="blogger.model.trained" class="badge badge-model">已训练</span>
+                <span v-if="soul.dataset.prepared" class="badge badge-dataset">数据已准备</span>
+                <span v-if="soul.model.trained" class="badge badge-model">已训练</span>
               </div>
             </div>
           </div>
         </div>
 
         <!-- 功能选项卡 -->
-        <div v-if="selectedBlogger" class="card">
+        <div v-if="selectedSoul" class="card">
           <div class="tabs">
             <button class="tab" :class="{ active: activeTab === 'prepare' }" @click="activeTab = 'prepare'">
               数据准备
@@ -652,7 +653,7 @@
               :class="{ active: activeTab === 'synthesize' }"
               @click="activeTab = 'synthesize'"
               style="background: var(--primary-color) !important;"
-              v-if="currentBloggerInfo && currentBloggerInfo.model && currentBloggerInfo.model.ready"
+              v-if="currentSoulInfo && currentSoulInfo.model && currentSoulInfo.model.ready"
             >
               语音合成
             </button>
@@ -660,7 +661,7 @@
               class="tab"
               :class="{ active: activeTab === 'emotions' }"
               @click="activeTab = 'emotions'; loadEmotions()"
-              v-if="currentBloggerInfo && currentBloggerInfo.dataset && currentBloggerInfo.dataset.exists"
+              v-if="currentSoulInfo && currentSoulInfo.dataset && currentSoulInfo.dataset.exists"
             >
               情绪标注
             </button>
@@ -668,7 +669,7 @@
               class="tab"
               :class="{ active: activeTab === 'expressions' }"
               @click="activeTab = 'expressions'; loadExpressions()"
-              v-if="currentBloggerInfo && currentBloggerInfo.dataset && currentBloggerInfo.dataset.exists"
+              v-if="currentSoulInfo && currentSoulInfo.dataset && currentSoulInfo.dataset.exists"
               style="background: var(--warning-color) !important;"
             >
               表情库
@@ -681,20 +682,20 @@
               从清洗后的音频和文本中提取训练数据片段
             </p>
 
-            <div v-if="currentBloggerInfo">
+            <div v-if="currentSoulInfo">
               <div class="model-card">
                 <div class="model-info">
                   <div class="model-name">源数据</div>
-                  <div class="model-size">{{ currentBloggerInfo.source.total_pairs || 0 }} 个音频+文本对</div>
+                  <div class="model-size">{{ currentSoulInfo.source.total_pairs || 0 }} 个音频+文本对</div>
                 </div>
               </div>
 
-              <div v-if="currentBloggerInfo.dataset.exists" class="model-card">
+              <div v-if="currentSoulInfo.dataset.exists" class="model-card">
                 <div class="model-info">
                   <div class="model-name">训练数据集</div>
                   <div class="model-size">
-                    {{ currentBloggerInfo.dataset.segment_count }} 个片段,
-                    {{ currentBloggerInfo.dataset.total_duration_minutes }} 分钟
+                    {{ currentSoulInfo.dataset.segment_count }} 个片段,
+                    {{ currentSoulInfo.dataset.total_duration_minutes }} 分钟
                   </div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -716,7 +717,7 @@
                 @click="startPrepare"
               >
                 <span v-if="preparing" class="spinner"></span>
-                {{ preparing ? '准备中...' : (currentBloggerInfo && currentBloggerInfo.dataset.exists ? '重新准备数据' : '开始准备数据') }}
+                {{ preparing ? '准备中...' : (currentSoulInfo && currentSoulInfo.dataset.exists ? '重新准备数据' : '开始准备数据') }}
               </button>
               <label style="display: flex; align-items: center; gap: 0.3rem; color: var(--text-muted); font-size: 0.85rem;">
                 <input type="checkbox" v-model="enableDenoise" style="margin: 0;">
@@ -747,7 +748,7 @@
               请先下载预训练模型
             </div>
 
-            <div v-else-if="!currentBloggerInfo || !currentBloggerInfo.dataset.exists" style="color: var(--warning-color); margin-bottom: 1rem;">
+            <div v-else-if="!currentSoulInfo || !currentSoulInfo.dataset.exists" style="color: var(--warning-color); margin-bottom: 1rem;">
               请先准备训练数据
             </div>
 
@@ -810,14 +811,14 @@
               </div>
 
               <!-- 已训练模型路径 -->
-              <div v-if="currentBloggerInfo && currentBloggerInfo.model && currentBloggerInfo.model.ready" class="path-info" style="margin-top: 1rem;">
+              <div v-if="currentSoulInfo && currentSoulInfo.model && currentSoulInfo.model.ready" class="path-info" style="margin-top: 1rem;">
                 <div class="path-item">
                   <span class="path-label">GPT 模型:</span>
-                  <span class="path-value">{{ currentBloggerInfo.model.models.gpt.path || '-' }}</span>
+                  <span class="path-value">{{ currentSoulInfo.model.models.gpt.path || '-' }}</span>
                 </div>
                 <div class="path-item">
                   <span class="path-label">SoVITS 模型:</span>
-                  <span class="path-value">{{ currentBloggerInfo.model.models.sovits.path || '-' }}</span>
+                  <span class="path-value">{{ currentSoulInfo.model.models.sovits.path || '-' }}</span>
                 </div>
                 <button
                   class="btn"
@@ -961,7 +962,7 @@
                     controls
                     crossorigin="anonymous"
                     preload="metadata"
-                    :src="API + '/audio/' + encodeURIComponent(selectedBlogger) + '/' + encodeURIComponent(audio.filename)"
+                    :src="API + '/audio/' + encodeURIComponent(selectedSoul) + '/' + encodeURIComponent(audio.filename)"
                     style="width: 100%; margin-top: 0.5rem; height: 32px;"
                   ></audio>
                 </div>
@@ -1025,7 +1026,7 @@
                         controls
                         crossorigin="anonymous"
                         preload="metadata"
-                        :src="API + '/expressions/' + encodeURIComponent(selectedBlogger) + '/audio/' + clip.id"
+                        :src="API + '/expressions/' + encodeURIComponent(selectedSoul) + '/audio/' + clip.id"
                         style="height: 32px; width: 150px;"
                       ></audio>
                       <button
@@ -1044,7 +1045,7 @@
                 <ol style="color: var(--text-muted); font-size: 0.9rem; padding-left: 1.25rem; margin: 0;">
                   <li style="margin-bottom: 0.5rem;">在"情绪标注"中找到包含笑声/语气词的音频</li>
                   <li style="margin-bottom: 0.5rem;">记下笑声的开始和结束时间（秒）</li>
-                  <li style="margin-bottom: 0.5rem;">使用 API 提取：POST /api/voice/expressions/{blogger}/extract</li>
+                  <li style="margin-bottom: 0.5rem;">使用 API 提取：POST /api/voice/expressions/{soul}/extract</li>
                   <li>合成时会自动用真实录音替换文本中的表情词</li>
                 </ol>
                 <div style="margin-top: 1rem; padding: 0.75rem; background: var(--card-bg); border-radius: 6px; font-size: 0.8rem; font-family: monospace;">
@@ -1077,9 +1078,9 @@
             modelDownloadPercent: 0,
             modelDownloadMessage: '',
 
-            bloggers: [],
-            selectedBlogger: null,
-            currentBloggerInfo: null,
+            souls: [],
+            selectedSoul: null,
+            currentSoulInfo: null,
             activeTab: 'prepare',
 
             // 数据准备
@@ -1136,7 +1137,7 @@
                 vm.currentDevice = data.device || 'cpu';
                 vm.pretrainedModels = data.pretrained_models;
                 vm.paths = data.paths || { pretrained_dir: '', trained_dir: '', datasets_dir: '' };
-                vm.loadBloggers();
+                vm.loadSouls();
                 vm.loadEmotionTypes();
               })
               .catch(function() {
@@ -1144,28 +1145,28 @@
               });
           },
 
-          loadBloggers: function() {
+          loadSouls: function() {
             var vm = this;
-            fetch(API + '/bloggers')
+            fetch(API + '/souls')
               .then(function(r) { return r.json(); })
               .then(function(data) {
-                vm.bloggers = data.bloggers;
+                vm.souls = data.souls;
               });
           },
 
-          selectBlogger: function(name) {
+          selectSoul: function(name) {
             var vm = this;
-            vm.selectedBlogger = name;
+            vm.selectedSoul = name;
             vm.prepareLogs = [];
             vm.trainingDone = false;
             vm.gptLosses = [];
             vm.sovitsLosses = [];
 
-            // 获取博主详情
-            fetch(API + '/blogger/' + encodeURIComponent(name))
+            // 获取详情
+            fetch(API + '/soul/' + encodeURIComponent(name))
               .then(function(r) { return r.json(); })
               .then(function(data) {
-                vm.currentBloggerInfo = data;
+                vm.currentSoulInfo = data;
                 if (data.model && data.model.ready) {
                   vm.activeTab = 'synthesize';
                 } else if (data.dataset && data.dataset.exists) {
@@ -1283,7 +1284,7 @@
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                blogger_name: vm.selectedBlogger,
+                soul_name: vm.selectedSoul,
                 enable_denoise: vm.enableDenoise,
               }),
             }).then(function(response) {
@@ -1294,7 +1295,7 @@
                 reader.read().then(function(result) {
                   if (result.done) {
                     vm.preparing = false;
-                    vm.selectBlogger(vm.selectedBlogger);
+                    vm.selectSoul(vm.selectedSoul);
                     return;
                   }
 
@@ -1419,7 +1420,7 @@
             fetch(API + '/train', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ blogger_name: vm.selectedBlogger }),
+              body: JSON.stringify({ soul_name: vm.selectedSoul }),
             }).then(function(response) {
               var reader = response.body.getReader();
               var decoder = new TextDecoder();
@@ -1428,7 +1429,7 @@
                 reader.read().then(function(result) {
                   if (result.done) {
                     vm.training = false;
-                    vm.selectBlogger(vm.selectedBlogger);
+                    vm.selectSoul(vm.selectedSoul);
                     return;
                   }
 
@@ -1500,7 +1501,7 @@
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                blogger_name: vm.selectedBlogger,
+                soul_name: vm.selectedSoul,
                 text: vm.synthesizeText,
                 speed: parseFloat(vm.synthesizeSpeed),
                 emotion: vm.synthesizeEmotion,
@@ -1534,7 +1535,7 @@
               return;
             }
 
-            fetch(API + '/dataset/' + encodeURIComponent(vm.selectedBlogger), {
+            fetch(API + '/dataset/' + encodeURIComponent(vm.selectedSoul), {
               method: 'DELETE',
             })
               .then(function(r) {
@@ -1547,7 +1548,7 @@
               })
               .then(function(data) {
                 alert(data.message || '删除成功');
-                vm.selectBlogger(vm.selectedBlogger);
+                vm.selectSoul(vm.selectedSoul);
               })
               .catch(function(err) {
                 alert('删除失败: ' + err.message);
@@ -1560,7 +1561,7 @@
               return;
             }
 
-            fetch(API + '/model/' + encodeURIComponent(vm.selectedBlogger), {
+            fetch(API + '/model/' + encodeURIComponent(vm.selectedSoul), {
               method: 'DELETE',
             })
               .then(function(r) {
@@ -1573,7 +1574,7 @@
               })
               .then(function(data) {
                 alert(data.message || '删除成功');
-                vm.selectBlogger(vm.selectedBlogger);
+                vm.selectSoul(vm.selectedSoul);
               })
               .catch(function(err) {
                 alert('删除失败: ' + err.message);
@@ -1591,10 +1592,10 @@
 
           loadEmotions: function() {
             var vm = this;
-            if (!vm.selectedBlogger) return;
+            if (!vm.selectedSoul) return;
 
             vm.loadingEmotions = true;
-            fetch(API + '/emotions/' + encodeURIComponent(vm.selectedBlogger) + '/audios')
+            fetch(API + '/emotions/' + encodeURIComponent(vm.selectedSoul) + '/audios')
               .then(function(r) { return r.json(); })
               .then(function(data) {
                 vm.emotionAudios = data.audios || [];
@@ -1610,7 +1611,7 @@
 
           tagEmotion: function(filename, emotion) {
             var vm = this;
-            fetch(API + '/emotions/' + encodeURIComponent(vm.selectedBlogger) + '/tag', {
+            fetch(API + '/emotions/' + encodeURIComponent(vm.selectedSoul) + '/tag', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -1637,10 +1638,10 @@
 
           loadExpressions: function() {
             var vm = this;
-            if (!vm.selectedBlogger) return;
+            if (!vm.selectedSoul) return;
 
             vm.loadingExpressions = true;
-            fetch(API + '/expressions/' + encodeURIComponent(vm.selectedBlogger))
+            fetch(API + '/expressions/' + encodeURIComponent(vm.selectedSoul))
               .then(function(r) { return r.json(); })
               .then(function(data) {
                 vm.expressionClips = data.clips || [];
@@ -1658,7 +1659,7 @@
             var vm = this;
             if (!confirm('确定要删除这个表情片段吗？')) return;
 
-            fetch(API + '/expressions/' + encodeURIComponent(vm.selectedBlogger) + '/' + clipId, {
+            fetch(API + '/expressions/' + encodeURIComponent(vm.selectedSoul) + '/' + clipId, {
               method: 'DELETE',
             })
               .then(function(r) { return r.json(); })

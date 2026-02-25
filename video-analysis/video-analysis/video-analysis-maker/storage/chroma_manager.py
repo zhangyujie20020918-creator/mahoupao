@@ -28,13 +28,13 @@ class SearchResult:
 class ChromaManager:
     """ChromaDB 向量数据库管理器"""
 
-    def __init__(self, blogger_name: str, persist_dir: Optional[Path] = None):
+    def __init__(self, soul_name: str, persist_dir: Optional[Path] = None):
         self.settings = get_settings()
-        self.blogger_name = blogger_name
+        self.soul_name = soul_name
 
         # 设置持久化目录
         if persist_dir is None:
-            persist_dir = self.settings.get_blogger_output_dir(blogger_name) / "chroma_db"
+            persist_dir = self.settings.get_soul_output_dir(soul_name) / "chroma_db"
         self.persist_dir = persist_dir
         self.persist_dir.mkdir(parents=True, exist_ok=True)
 
@@ -45,18 +45,18 @@ class ChromaManager:
         )
 
         # Collection 名称（移除特殊字符）
-        self.collection_name = self._sanitize_collection_name(blogger_name)
+        self.collection_name = self._sanitize_collection_name(soul_name)
 
         # 获取或创建 collection
         self.collection = self.client.get_or_create_collection(
             name=self.collection_name,
-            metadata={"blogger": blogger_name, "hnsw:space": "cosine"}
+            metadata={"soul": soul_name, "hnsw:space": "cosine"}
         )
 
         # 初始化 embedder
         self.embedder = TextEmbedder()
 
-        logger.info(f"ChromaManager initialized for {blogger_name}, collection: {self.collection_name}")
+        logger.info(f"ChromaManager initialized for {soul_name}, collection: {self.collection_name}")
 
     def _sanitize_collection_name(self, name: str) -> str:
         """清理 collection 名称，移除不合法字符"""
@@ -71,9 +71,9 @@ class ChromaManager:
         # 只保留字母数字和允许的字符
         sanitized = re.sub(r'[^a-zA-Z0-9._-]', '', name)
 
-        # 如果没有有效字符，使用 blogger_ 前缀 + hash
+        # 如果没有有效字符，使用 soul_ 前缀 + hash
         if not sanitized:
-            sanitized = f"blogger_{name_hash}"
+            sanitized = f"soul_{name_hash}"
         else:
             # 确保开头是字母或数字
             if not sanitized[0].isalnum():
@@ -112,7 +112,7 @@ class ChromaManager:
                     all_texts.append(seg.optimized_text)
                     all_metadatas.append({
                         "video_title": video.video_title,
-                        "blogger_name": video.blogger_name,
+                        "soul_name": video.soul_name,
                         "segment_index": seg.segment_index,
                         "start": seg.start,
                         "end": seg.end,
@@ -125,7 +125,7 @@ class ChromaManager:
                 all_texts.append(video.optimized_full_text)
                 all_metadatas.append({
                     "video_title": video.video_title,
-                    "blogger_name": video.blogger_name,
+                    "soul_name": video.soul_name,
                     "segment_index": 0,
                     "start": 0.0,
                     "end": 0.0,
@@ -262,7 +262,7 @@ class ChromaManager:
         count = self.collection.count()
         return {
             "collection_name": self.collection_name,
-            "blogger_name": self.blogger_name,
+            "soul_name": self.soul_name,
             "document_count": count,
             "persist_dir": str(self.persist_dir)
         }

@@ -17,7 +17,7 @@ def get_collection_name(persona_name: str) -> str:
     sanitized = re.sub(r"[^a-zA-Z0-9._-]", "", persona_name)
 
     if not sanitized:
-        sanitized = f"blogger_{name_hash}"
+        sanitized = f"soul_{name_hash}"
     else:
         if not sanitized[0].isalnum():
             sanitized = f"b{sanitized}"
