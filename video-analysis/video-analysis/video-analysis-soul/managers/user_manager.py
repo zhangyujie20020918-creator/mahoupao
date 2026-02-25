@@ -125,14 +125,16 @@ class UserManager:
 
         user.name = name
         user.gender = gender
-        user.passphrase_hash = hash_text(passphrase)
-        user.secrets = [
-            SecretAnswer(
-                question_id=s["question_id"],
-                answer_hash=hash_text(s["answer"]),
-            )
-            for s in secrets
-        ]
+        if passphrase:
+            user.passphrase_hash = hash_text(passphrase)
+        if secrets:
+            user.secrets = [
+                SecretAnswer(
+                    question_id=s["question_id"],
+                    answer_hash=hash_text(s["answer"]),
+                )
+                for s in secrets
+            ]
         user.is_anonymous = False
         user.is_registered = True
         return await self._repo.update(user)

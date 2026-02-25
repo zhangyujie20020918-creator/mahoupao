@@ -25,9 +25,9 @@ class UpgradeRequest(BaseModel):
 
     user_id: str
     name: str
-    gender: str
-    passphrase: str
-    secrets: List[Dict] = Field(..., min_length=1)
+    gender: str = "unknown"
+    passphrase: str = ""
+    secrets: List[Dict] = Field(default=[])
 
 
 class VerifyPassphraseRequest(BaseModel):

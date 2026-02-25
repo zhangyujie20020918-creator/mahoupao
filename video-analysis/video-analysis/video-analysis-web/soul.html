@@ -192,19 +192,58 @@
       /* ===== Message Bubbles ===== */
       .message {
         display: flex;
-        flex-direction: column;
-        max-width: 70%;
+        gap: 0.6rem;
+        max-width: 75%;
         animation: fadeInUp 0.3s ease;
       }
 
       .message-user {
         align-self: flex-end;
-        align-items: flex-end;
+        flex-direction: row-reverse;
       }
 
       .message-assistant {
         align-self: flex-start;
-        align-items: flex-start;
+        flex-direction: row;
+      }
+
+      .message-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+        font-weight: 600;
+        flex-shrink: 0;
+        margin-top: 1.2rem;
+      }
+
+      .message-user .message-avatar {
+        background: var(--primary-color);
+        color: white;
+      }
+
+      .message-assistant .message-avatar {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-color);
+      }
+
+      .message-body {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      .message-user .message-body { align-items: flex-end; }
+      .message-assistant .message-body { align-items: flex-start; }
+
+      .message-sender {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-bottom: 3px;
+        padding: 0 4px;
       }
 
       .message-bubble {
@@ -452,6 +491,69 @@
       .modal-btn:hover:not(:disabled) { background: var(--primary-hover); }
       .modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+      /* ===== User Info ===== */
+      .user-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+      }
+
+      .user-name {
+        max-width: 100px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .register-btn {
+        padding: 0.3rem 0.6rem;
+        background: linear-gradient(135deg, var(--primary-color), #fb923c);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s;
+      }
+
+      .register-btn:hover { opacity: 0.85; }
+
+      .modal-row {
+        margin-bottom: 1rem;
+      }
+
+      .modal-label {
+        display: block;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-bottom: 0.4rem;
+      }
+
+      .gender-options {
+        display: flex;
+        gap: 0.75rem;
+      }
+
+      .gender-option {
+        padding: 0.5rem 1rem;
+        background: var(--bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.9rem;
+      }
+
+      .gender-option.selected {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+        background: rgba(249, 115, 22, 0.1);
+      }
+
       /* ===== Footer link ===== */
       .dev-link {
         text-align: center;
@@ -505,6 +607,32 @@
         </div>
       </div>
 
+      <!-- Register Modal -->
+      <div v-if="showRegister" class="modal-overlay" @click.self="showRegister = false">
+        <div class="modal">
+          <h2 class="modal-title">注册账号</h2>
+          <p class="modal-desc">注册后下次来可以认出你，还能记住你们的聊天记忆。</p>
+          <div class="modal-row">
+            <label class="modal-label">昵称</label>
+            <input v-model="regName" class="modal-input" placeholder="给自己取个名字..." style="margin-bottom: 0;" />
+          </div>
+          <div class="modal-row">
+            <label class="modal-label">性别</label>
+            <div class="gender-options">
+              <span class="gender-option" :class="{ selected: regGender === 'male' }" @click="regGender = 'male'">男</span>
+              <span class="gender-option" :class="{ selected: regGender === 'female' }" @click="regGender = 'female'">女</span>
+            </div>
+          </div>
+          <div class="modal-row">
+            <label class="modal-label">口令（下次登录用）</label>
+            <input v-model="regPassphrase" class="modal-input" type="password" placeholder="设一个简单好记的口令..." style="margin-bottom: 0;" />
+          </div>
+          <button class="modal-btn" :disabled="!regName.trim() || upgrading" @click="doUpgrade">
+            {{ upgrading ? '注册中...' : '完成注册' }}
+          </button>
+        </div>
+      </div>
+
       <!-- Top Bar -->
       <div class="topbar">
         <div class="topbar-left">
@@ -512,6 +640,11 @@
           <span class="status-dot" :class="serviceOnline ? 'online' : 'offline'" :title="serviceOnline ? '服务在线' : '服务离线'"></span>
         </div>
         <div class="topbar-right">
+          <!-- User info -->
+          <div v-if="userId" class="user-info">
+            <span class="user-name">{{ userName }}</span>
+            <button v-if="isAnonymous" class="register-btn" @click="showRegister = true">注册</button>
+          </div>
           <!-- Mobile soul dropdown -->
           <div class="soul-dropdown">
             <select class="soul-dropdown-btn" v-model="currentSoul" @change="selectSoul(currentSoul)">
@@ -575,17 +708,22 @@
               :key="msg.id"
               class="message"
               :class="'message-' + msg.role"
+              v-show="msg.content || !msg.isStreaming"
             >
-              <div class="message-bubble">{{ msg.content }}<span v-if="msg.isStreaming" class="cursor-blink">|</span></div>
-              <div class="message-time">{{ formatTime(msg.timestamp) }}</div>
-              <!-- Sources -->
-              <div v-if="msg.sources && msg.sources.length > 0" class="message-sources">
-                <button class="sources-toggle" @click="toggleSources(msg.id)">
-                  {{ showSources[msg.id] ? '收起参考来源' : '查看参考来源 (' + msg.sources.length + ')' }}
-                </button>
-                <div v-if="showSources[msg.id]" class="sources-list">
-                  <div v-for="(src, i) in msg.sources" :key="i" class="source-item">
-                    {{ src }}
+              <div class="message-avatar">{{ msg.role === 'user' ? userName.charAt(0) : currentSoul.charAt(0) }}</div>
+              <div class="message-body">
+                <div class="message-sender">{{ msg.role === 'user' ? userName : currentSoul }}</div>
+                <div class="message-bubble">{{ msg.content }}</div>
+                <div class="message-time">{{ formatTime(msg.timestamp) }}</div>
+                <!-- Sources -->
+                <div v-if="msg.sources && msg.sources.length > 0" class="message-sources">
+                  <button class="sources-toggle" @click="toggleSources(msg.id)">
+                    {{ showSources[msg.id] ? '收起参考来源' : '查看参考来源 (' + msg.sources.length + ')' }}
+                  </button>
+                  <div v-if="showSources[msg.id]" class="sources-list">
+                    <div v-for="(src, i) in msg.sources" :key="i" class="source-item">
+                      {{ src }}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -613,7 +751,7 @@
                 @keydown="handleKeydown"
                 @input="autoResize"
               ></textarea>
-              <span class="input-hint">Ctrl + Enter 发送</span>
+              <span class="input-hint">Shift + Enter 换行</span>
             </div>
             <button class="send-btn" :disabled="!inputText.trim() || isSending" @click="sendMessage">
               &#9654;
@@ -653,6 +791,13 @@
             sidebarOpen: true,
             showSources: {},
 
+            isAnonymous: localStorage.getItem('soul_is_anonymous') === 'true',
+            showRegister: false,
+            regName: '',
+            regGender: '',
+            regPassphrase: '',
+            upgrading: false,
+
             serviceOnline: false,
             msgIdCounter: 0,
           };
@@ -685,21 +830,30 @@
 
           validateUser: function() {
             var vm = this;
-            fetch(API + '/users')
-              .then(function(r) { return r.json(); })
+            fetch(API + '/auth/user/' + encodeURIComponent(vm.userId))
+              .then(function(r) {
+                if (!r.ok) throw new Error('not found');
+                return r.json();
+              })
               .then(function(data) {
-                var users = (data.data && data.data.users) || [];
-                var found = users.some(function(u) { return u.id === vm.userId; });
-                if (!found) {
-                  // 用户已被删除，清除本地缓存，重新弹欢迎窗
-                  localStorage.removeItem('soul_user_id');
-                  localStorage.removeItem('soul_user_name');
-                  vm.userId = '';
-                  vm.userName = '';
-                  vm.showWelcome = true;
+                if (data.success && data.data) {
+                  vm.userName = data.data.name;
+                  vm.isAnonymous = data.data.is_anonymous;
+                  localStorage.setItem('soul_user_name', vm.userName);
+                  localStorage.setItem('soul_is_anonymous', String(vm.isAnonymous));
+                } else {
+                  throw new Error('invalid');
                 }
               })
-              .catch(function() {});
+              .catch(function() {
+                localStorage.removeItem('soul_user_id');
+                localStorage.removeItem('soul_user_name');
+                localStorage.removeItem('soul_is_anonymous');
+                vm.userId = '';
+                vm.userName = '';
+                vm.isAnonymous = false;
+                vm.showWelcome = true;
+              });
           },
 
           createAnonymous: function() {
@@ -716,8 +870,10 @@
                 if (data.success && data.data) {
                   vm.userId = data.data.id;
                   vm.userName = data.data.name;
+                  vm.isAnonymous = true;
                   localStorage.setItem('soul_user_id', vm.userId);
                   localStorage.setItem('soul_user_name', vm.userName);
+                  localStorage.setItem('soul_is_anonymous', 'true');
                   vm.showWelcome = false;
                 }
               })
@@ -744,14 +900,49 @@
                 if (data.success && data.data) {
                   vm.userId = data.data.id;
                   vm.userName = data.data.name;
+                  vm.isAnonymous = false;
                   localStorage.setItem('soul_user_id', vm.userId);
                   localStorage.setItem('soul_user_name', vm.userName);
+                  localStorage.setItem('soul_is_anonymous', 'false');
                   vm.showWelcome = false;
                 }
               })
               .catch(function() {
                 vm.creatingUser = false;
                 alert('创建用户失败，请检查服务是否启动');
+              });
+          },
+
+          doUpgrade: function() {
+            var vm = this;
+            var name = vm.regName.trim();
+            if (!name || vm.upgrading) return;
+            vm.upgrading = true;
+            fetch(API + '/auth/upgrade', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                user_id: vm.userId,
+                name: name,
+                gender: vm.regGender || 'unknown',
+                passphrase: vm.regPassphrase || '',
+                secrets: [],
+              }),
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                vm.upgrading = false;
+                if (data.success && data.data) {
+                  vm.userName = data.data.name;
+                  vm.isAnonymous = false;
+                  vm.showRegister = false;
+                  localStorage.setItem('soul_user_name', vm.userName);
+                  localStorage.setItem('soul_is_anonymous', 'false');
+                }
+              })
+              .catch(function() {
+                vm.upgrading = false;
+                alert('注册失败，请稍后重试');
               });
           },
 
@@ -788,7 +979,7 @@
                     vm.msgIdCounter++;
                     return {
                       id: vm.msgIdCounter,
-                      role: m.role === 'human' ? 'user' : 'assistant',
+                      role: m.role === 'user' ? 'user' : 'assistant',
                       content: m.content || '',
                       timestamp: m.timestamp || null,
                       sources: m.sources || [],
@@ -971,7 +1162,7 @@
           },
 
           handleKeydown: function(e) {
-            if (e.ctrlKey && e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
               this.sendMessage();
             }
