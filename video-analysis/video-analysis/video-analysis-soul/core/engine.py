@@ -280,6 +280,8 @@ class SoulEngine:
         soul_name: str,
         message: str,
         model: Optional[str] = None,
+        enable_tts: Optional[bool] = None,
+        enable_connection_agent: Optional[bool] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         处理对话请求（真实流式）
@@ -349,7 +351,7 @@ class SoulEngine:
             yield {"event": "sentence_end", "data": {"sentence_id": 0}}
 
             # TTS for greeting
-            if self.tts_service:
+            if self.tts_service and enable_tts is not False:
                 tts_result = await self._tts_for_sentence(
                     0, greeting_response, soul_name
                 )
@@ -380,6 +382,7 @@ class SoulEngine:
         if (
             context_state.get("is_anonymous")
             and settings.connection_agent.enabled
+            and enable_connection_agent is not False
         ):
             context_state["system_prompt"] = _inject_connection_instructions(
                 context_state.get("system_prompt", ""), context_state
@@ -449,7 +452,7 @@ class SoulEngine:
                     }
 
                     # 异步 TTS
-                    if self.tts_service:
+                    if self.tts_service and enable_tts is not False:
                         tts_tasks[sentence_id] = asyncio.create_task(
                             self._tts_for_sentence(
                                 sentence_id, completed, soul_name
@@ -489,7 +492,7 @@ class SoulEngine:
                 "event": "sentence_end",
                 "data": {"sentence_id": sentence_id},
             }
-            if self.tts_service:
+            if self.tts_service and enable_tts is not False:
                 tts_tasks[sentence_id] = asyncio.create_task(
                     self._tts_for_sentence(
                         sentence_id, current_sentence.strip(), soul_name

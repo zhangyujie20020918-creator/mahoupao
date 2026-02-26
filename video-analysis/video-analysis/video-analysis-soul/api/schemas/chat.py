@@ -12,6 +12,8 @@ class ChatRequest(BaseModel):
     soul: str
     message: str
     model: Optional[str] = None
+    enable_tts: Optional[bool] = None
+    enable_connection_agent: Optional[bool] = None
 
 
 class ChatEvent(BaseModel):

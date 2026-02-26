@@ -276,6 +276,102 @@
         opacity: 0.9;
       }
 
+      /* Speaker icon button */
+      .speaker-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 4px 6px;
+        margin-top: 0.4rem;
+        color: var(--text-muted);
+        transition: color 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75rem;
+        border-radius: 6px;
+      }
+      .speaker-btn:hover { color: var(--primary-color); background: rgba(249,115,22,0.08); }
+      .speaker-btn.playing { color: var(--primary-color); }
+      .speaker-btn.playing svg { animation: pulse-speaker 1.2s ease-in-out infinite; }
+
+      @keyframes pulse-speaker {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.2); opacity: 0.7; }
+      }
+
+      /* Topbar audio control buttons */
+      .audio-controls {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+      .audio-ctrl-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 6px;
+        border-radius: 6px;
+        color: var(--text-muted);
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        position: relative;
+      }
+      .audio-ctrl-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-color); }
+      .audio-ctrl-btn.active { color: var(--primary-color); }
+      .audio-ctrl-btn.disabled { opacity: 0.3; pointer-events: none; }
+      .audio-ctrl-btn .ctrl-tooltip {
+        display: none;
+        position: absolute;
+        bottom: -28px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #333;
+        color: #eee;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        white-space: nowrap;
+      }
+      .audio-ctrl-btn:hover .ctrl-tooltip { display: block; }
+
+      /* Dev toggle (connection agent etc.) */
+      .dev-toggle {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 6px;
+        transition: background 0.2s;
+      }
+      .dev-toggle:hover { background: rgba(255,255,255,0.06); }
+      .toggle-switch {
+        width: 28px;
+        height: 16px;
+        border-radius: 8px;
+        background: rgba(255,255,255,0.15);
+        position: relative;
+        transition: background 0.2s;
+        flex-shrink: 0;
+      }
+      .toggle-switch.on { background: var(--primary-color); }
+      .toggle-switch::after {
+        content: '';
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: white;
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        transition: transform 0.2s;
+      }
+      .toggle-switch.on::after { transform: translateX(12px); }
+
       /* Grouped assistant messages: reduce gap */
       .message-assistant.message-grouped {
         margin-top: -0.6rem;
@@ -664,6 +760,23 @@
             <span class="user-name">{{ userName }}</span>
             <button v-if="isAnonymous" class="register-btn" @click="showRegister = true">注册</button>
           </div>
+          <!-- Audio controls -->
+          <div class="audio-controls">
+            <button class="audio-ctrl-btn" :class="{ active: audioEnabled }" @click="toggleAudioEnabled" :title="audioEnabled ? '关闭语音' : '开启语音'">
+              <svg v-if="audioEnabled" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+              <span class="ctrl-tooltip">{{ audioEnabled ? '关闭语音' : '开启语音' }}</span>
+            </button>
+            <button class="audio-ctrl-btn" :class="{ active: autoPlayAudio, disabled: !audioEnabled }" @click="toggleAutoPlay" :title="autoPlayAudio ? '关闭自动播放' : '开启自动播放'">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/><path v-if="autoPlayAudio" d="M22 2L22 22" stroke-dasharray="2 3"/></svg>
+              <span class="ctrl-tooltip">{{ autoPlayAudio ? '关闭自动播放' : '开启自动播放' }}</span>
+            </button>
+          </div>
+          <!-- Connection Agent toggle -->
+          <div class="dev-toggle" @click="toggleConnectionAgent" :title="connectionAgentEnabled ? '关闭 Connection Agent' : '开启 Connection Agent'">
+            <div class="toggle-switch" :class="{ on: connectionAgentEnabled }"></div>
+            <span>连接</span>
+          </div>
           <!-- Mobile soul dropdown -->
           <div class="soul-dropdown">
             <select class="soul-dropdown-btn" v-model="currentSoul" @change="selectSoul(currentSoul)">
@@ -739,8 +852,10 @@
                   {{ msg.role === 'user' ? userName : currentSoul }}
                 </div>
                 <div class="message-bubble">{{ msg.content }}</div>
-                <audio v-if="msg.audioSrc" controls :src="msg.audioSrc"
-                  class="message-audio"></audio>
+                <button v-if="msg.audioSrc" class="speaker-btn" :class="{ playing: msg.isPlaying }" @click="togglePlayAudio(msg)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path v-if="!msg.isPlaying" d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path v-if="msg.isPlaying" d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path v-if="msg.isPlaying" d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                  <span style="font-size:0.7rem">{{ msg.isPlaying ? '播放中' : '播放' }}</span>
+                </button>
                 <div v-if="msg.role === 'user' || msg.isFirstInGroup" class="message-time">
                   {{ formatTime(msg.timestamp) }}
                 </div>
@@ -819,6 +934,12 @@
 
             sidebarOpen: true,
             showSources: {},
+
+            audioEnabled: localStorage.getItem('soul_audio_enabled') !== 'false',
+            autoPlayAudio: localStorage.getItem('soul_auto_play_audio') !== 'false',
+            currentAudio: null,
+            currentPlayingMsgId: null,
+            connectionAgentEnabled: localStorage.getItem('soul_connection_agent') !== 'false',
 
             isAnonymous: localStorage.getItem('soul_is_anonymous') === 'true',
             showRegister: false,
@@ -1042,6 +1163,7 @@
               sources: [],
               audioSrc: null,
               isStreaming: false,
+              isPlaying: false,
               groupId: null,
               sentenceId: null,
               isFirstInGroup: true,
@@ -1070,6 +1192,8 @@
                 user_id: vm.userId,
                 soul: vm.currentSoul,
                 message: text,
+                enable_tts: vm.audioEnabled,
+                enable_connection_agent: vm.connectionAgentEnabled,
               }),
             }).then(function(response) {
               var reader = response.body.getReader();
@@ -1136,6 +1260,7 @@
                 sources: [],
                 audioSrc: null,
                 isStreaming: false,
+                isPlaying: false,
                 groupId: groupId,
                 sentenceId: 0,
                 isFirstInGroup: true,
@@ -1165,6 +1290,7 @@
                 sources: [],
                 audioSrc: null,
                 isStreaming: true,
+                isPlaying: false,
                 groupId: groupId,
                 sentenceId: sid,
                 isFirstInGroup: isFirst,
@@ -1186,6 +1312,7 @@
                   sources: [],
                   audioSrc: null,
                   isStreaming: true,
+                  isPlaying: false,
                   groupId: groupId,
                   sentenceId: sid,
                   isFirstInGroup: isFirst,
@@ -1201,6 +1328,7 @@
                 msg.isStreaming = false;
               }
             } else if (event === 'audio') {
+              if (!vm.audioEnabled) return;
               var sid = data.sentence_id != null ? data.sentence_id : 0;
               console.log('[SSE] audio event: sentence_id=' + sid + ', base64_len=' + (data.audio_base64 ? data.audio_base64.length : 0));
               var msg = vm.findSentenceMessage(groupId, sid);
@@ -1221,6 +1349,10 @@
                   // fallback to data URI
                   msg.audioSrc = 'data:audio/' + fmt + ';base64,' + data.audio_base64;
                   console.warn('[SSE] audio: blob failed, using data URI', blobErr);
+                }
+                // 自动播放
+                if (vm.autoPlayAudio) {
+                  vm.$nextTick(function() { vm.togglePlayAudio(msg); });
                 }
                 vm.scrollToBottom();
               }
@@ -1251,6 +1383,7 @@
                   sources: [],
                   audioSrc: null,
                   isStreaming: false,
+                  isPlaying: false,
                   groupId: groupId,
                   sentenceId: 0,
                   isFirstInGroup: true,
@@ -1277,6 +1410,65 @@
               }
             }
             return null;
+          },
+
+          toggleConnectionAgent: function() {
+            this.connectionAgentEnabled = !this.connectionAgentEnabled;
+            localStorage.setItem('soul_connection_agent', String(this.connectionAgentEnabled));
+          },
+
+          toggleAudioEnabled: function() {
+            this.audioEnabled = !this.audioEnabled;
+            localStorage.setItem('soul_audio_enabled', String(this.audioEnabled));
+            if (!this.audioEnabled) {
+              this.stopCurrentAudio();
+            }
+          },
+
+          toggleAutoPlay: function() {
+            if (!this.audioEnabled) return;
+            this.autoPlayAudio = !this.autoPlayAudio;
+            localStorage.setItem('soul_auto_play_audio', String(this.autoPlayAudio));
+          },
+
+          togglePlayAudio: function(msg) {
+            var vm = this;
+            // 如果点击的是当前正在播放的消息 → 停止
+            if (vm.currentPlayingMsgId === msg.id && vm.currentAudio) {
+              vm.stopCurrentAudio();
+              return;
+            }
+            // 停止之前的播放
+            vm.stopCurrentAudio();
+            // 创建新的 Audio 并播放
+            var audio = new Audio(msg.audioSrc);
+            vm.currentAudio = audio;
+            vm.currentPlayingMsgId = msg.id;
+            msg.isPlaying = true;
+            audio.play().catch(function(e) {
+              console.warn('Audio play failed:', e);
+              msg.isPlaying = false;
+              vm.currentAudio = null;
+              vm.currentPlayingMsgId = null;
+            });
+            audio.addEventListener('ended', function() {
+              msg.isPlaying = false;
+              vm.currentAudio = null;
+              vm.currentPlayingMsgId = null;
+            });
+          },
+
+          stopCurrentAudio: function() {
+            if (this.currentAudio) {
+              this.currentAudio.pause();
+              this.currentAudio.currentTime = 0;
+              this.currentAudio = null;
+            }
+            if (this.currentPlayingMsgId != null) {
+              var playingMsg = this.findMessage(this.currentPlayingMsgId);
+              if (playingMsg) playingMsg.isPlaying = false;
+              this.currentPlayingMsgId = null;
+            }
           },
 
           toggleSources: function(msgId) {

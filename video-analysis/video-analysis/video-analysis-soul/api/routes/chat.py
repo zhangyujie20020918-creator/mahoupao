@@ -39,6 +39,8 @@ async def chat(body: ChatRequest, request: Request):
                 soul_name=body.soul,
                 message=body.message,
                 model=body.model,
+                enable_tts=body.enable_tts,
+                enable_connection_agent=body.enable_connection_agent,
             ):
                 event_type = event.get("event", "token")
                 event_data = json.dumps(event.get("data", {}), ensure_ascii=False)

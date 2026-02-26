@@ -531,6 +531,38 @@
         font-size: 0.9rem;
       }
 
+      /* Dev toggle switch */
+      .dev-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        padding: 4px 0;
+      }
+      .toggle-switch {
+        width: 32px;
+        height: 18px;
+        border-radius: 9px;
+        background: rgba(255,255,255,0.15);
+        position: relative;
+        transition: background 0.2s;
+        flex-shrink: 0;
+      }
+      .toggle-switch.on { background: var(--primary-color); }
+      .toggle-switch::after {
+        content: '';
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: white;
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        transition: transform 0.2s;
+      }
+      .toggle-switch.on::after { transform: translateX(14px); }
+      .toggle-label { font-size: 0.85rem; color: var(--text-muted); user-select: none; }
+
       /* Bottom padding for log panel */
       .content { padding-bottom: 4rem; }
     </style>
@@ -734,6 +766,13 @@
                     <option v-for="m in (modelsData ? modelsData.models : [])" :key="m" :value="m">{{ m }}</option>
                   </select>
                 </div>
+                <div class="form-group">
+                  <label class="form-label">Connection Agent</label>
+                  <div class="dev-toggle" @click="toggleConnectionAgent">
+                    <div class="toggle-switch" :class="{ on: connectionAgentEnabled }"></div>
+                    <span class="toggle-label">{{ connectionAgentEnabled ? '已开启' : '已关闭' }}</span>
+                  </div>
+                </div>
                 <div v-if="chatDebugInfo" class="debug-panel">
                   <div class="detail-label">Debug Info</div>
                   <pre>{{ JSON.stringify(chatDebugInfo, null, 2) }}</pre>
@@ -879,6 +918,7 @@
             sseEvents: [],
             chatDebugInfo: null,
             isChatting: false,
+            connectionAgentEnabled: localStorage.getItem('soul_connection_agent') !== 'false',
 
             // History
             historyUserId: '',
@@ -1029,6 +1069,11 @@
               .catch(function() {});
           },
 
+          toggleConnectionAgent: function() {
+            this.connectionAgentEnabled = !this.connectionAgentEnabled;
+            localStorage.setItem('soul_connection_agent', String(this.connectionAgentEnabled));
+          },
+
           // ===== Chat Test =====
           sendTestChat: function() {
             var vm = this;
@@ -1051,6 +1096,7 @@
               message: text,
             };
             if (vm.chatModel) body.model = vm.chatModel;
+            body.enable_connection_agent = vm.connectionAgentEnabled;
 
             // Log the request
             vm.requestLog.unshift({
