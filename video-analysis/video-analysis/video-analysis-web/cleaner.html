@@ -521,14 +521,37 @@
             <p style="color: var(--text-muted); margin-bottom: 1rem;">
               将文件夹中的 MP4 视频提取音频为 MP3 格式
             </p>
-            <button
-              class="btn btn-primary"
-              :disabled="converting"
-              @click="startConvert"
-            >
-              <span v-if="converting" class="spinner"></span>
-              {{ converting ? '转换中...' : '开始转换' }}
-            </button>
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 1rem; cursor: pointer; font-size: 0.9rem;">
+              <input type="checkbox" v-model="vocalSeparation" @change="saveVocalSeparation"
+                style="width: 16px; height: 16px; accent-color: var(--primary-color); cursor: pointer;" />
+              <span>人声分离（去除背景音乐）</span>
+              <span style="font-size: 0.75rem; color: var(--text-muted);">— 使用 Demucs AI 模型提取纯人声，首次使用需下载模型</span>
+            </label>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <button
+                class="btn btn-primary"
+                :disabled="converting || cleaningUp"
+                @click="startConvert"
+              >
+                <span v-if="converting" class="spinner"></span>
+                {{ converting ? '转换中...' : '开始转换' }}
+              </button>
+              <button
+                class="btn"
+                style="background: var(--error-color); color: #fff;"
+                :disabled="converting || cleaningUp"
+                @click="cleanupBadFiles"
+              >
+                <span v-if="cleaningUp" class="spinner"></span>
+                {{ cleaningUp ? '检测中...' : '清理损坏文件' }}
+              </button>
+            </div>
+            <div v-if="cleanupResults" style="margin-top: 0.75rem; padding: 0.75rem; background: rgba(255,255,255,0.05); border-radius: 8px; font-size: 0.9rem;">
+              {{ cleanupResults.message }}
+              <div v-if="cleanupResults.bad > 0" style="margin-top: 0.5rem; color: var(--warning-color); font-size: 0.8rem;">
+                删除后回到下载页面重新提交该用户主页即可补回
+              </div>
+            </div>
 
             <div v-if="convertLogs.length > 0" class="progress-section">
               <div class="progress-bar-container">
@@ -632,10 +655,15 @@
             activeTab: 'convert',
 
             converting: false,
+            vocalSeparation: localStorage.getItem('cleaner_vocal_separation') === 'true',
             convertLogs: [],
             convertMessage: '',
             convertPercent: 0,
             convertResults: null,
+
+            cleaningUp: false,
+            cleanupMessage: '',
+            cleanupResults: null,
 
             transcribing: false,
             transcribeLogs: [],
@@ -758,6 +786,10 @@
               });
           },
 
+          saveVocalSeparation: function() {
+            localStorage.setItem('cleaner_vocal_separation', String(this.vocalSeparation));
+          },
+
           startConvert: function() {
             var vm = this;
             vm.converting = true;
@@ -769,7 +801,7 @@
             fetch(API + '/convert', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ folder_name: vm.selectedFolder }),
+              body: JSON.stringify({ folder_name: vm.selectedFolder, vocal_separation: vm.vocalSeparation }),
             }).then(function(response) {
               var reader = response.body.getReader();
               var decoder = new TextDecoder();
@@ -795,6 +827,48 @@
                           vm.converting = false;
                           vm.convertResults = data;
                           vm.convertMessage = data.message;
+                        }
+                      } catch (e) {}
+                    }
+                  });
+                  read();
+                });
+              }
+              read();
+            });
+          },
+
+          cleanupBadFiles: function() {
+            var vm = this;
+            if (!confirm('将检测并删除所有损坏的 MP4 文件，确定继续？')) return;
+            vm.cleaningUp = true;
+            vm.cleanupResults = null;
+            vm.cleanupMessage = '检测中...';
+
+            fetch(API + '/cleanup/' + vm.selectedFolder, {
+              method: 'POST',
+            }).then(function(response) {
+              var reader = response.body.getReader();
+              var decoder = new TextDecoder();
+
+              function read() {
+                reader.read().then(function(result) {
+                  if (result.done) {
+                    vm.cleaningUp = false;
+                    vm.loadFolders();
+                    return;
+                  }
+                  var lines = decoder.decode(result.value).split('\n');
+                  lines.forEach(function(line) {
+                    if (line.startsWith('data: ')) {
+                      try {
+                        var data = JSON.parse(line.substring(6));
+                        if (data.type === 'progress') {
+                          vm.cleanupMessage = '[' + data.current + '/' + data.total + '] ' + data.file + ' - ' + data.message;
+                        } else if (data.type === 'done') {
+                          vm.cleaningUp = false;
+                          vm.cleanupResults = data;
+                          vm.cleanupMessage = data.message;
                         }
                       } catch (e) {}
                     }

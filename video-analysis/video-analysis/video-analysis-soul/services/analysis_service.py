@@ -155,14 +155,21 @@ class AnalysisService:
         }
 
     def _default_intent_prompt(self) -> str:
-        return """你是一个意图分析助手。分析用户消息的意图。
+        return """你是一个意图分析助手。精准判断用户消息的意图。
 
-可能的意图类型：
-- greeting: 打招呼
-- question: 专业问题（需要知识库）
-- recall: 提及过去的事情（需要记忆检索）
-- chat: 日常闲聊
-- farewell: 告别
+意图类型：
+- greeting: 打招呼、寒暄（你好、嗨、在吗、早上好等）
+- question: 专业问题，需要博主的知识库来回答（涉及博主擅长领域的提问、请求分析、求建议等）
+- recall: 提及过去的对话或事件（之前、上次、你说过、记得吗等）
+- chat: 日常闲聊，不需要专业知识库
+- farewell: 告别（再见、拜拜等）
+
+判断规则：
+1. needs_soul_knowledge：用户问题涉及博主专业领域，需要检索知识库才能回答时设为 true
+2. needs_memory_recall：用户引用了之前的对话内容时设为 true
+3. memory_keywords：用于检索历史对话的关键词，尽量具体
+4. 复合意图以主要意图为准（如"嗨，AI概念股怎么样？"→ question）
+5. 消息很短或模棱两可时，confidence 应降低
 
 请返回 JSON 格式：
 {

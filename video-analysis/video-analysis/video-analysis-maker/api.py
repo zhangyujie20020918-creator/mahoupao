@@ -7,6 +7,7 @@ Video Analysis Maker - API 服务
 import json
 import logging
 import asyncio
+import shutil
 from pathlib import Path
 from typing import AsyncGenerator
 
@@ -263,6 +264,104 @@ async def train_soul(request: TrainRequest):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
     )
+
+
+@app.get("/api/maker/soul/{soul_name}/archive-status")
+async def get_archive_status(soul_name: str):
+    """检查归档条件"""
+    settings = get_settings()
+    downloads_dir = settings.downloads_dir / soul_name
+
+    if not downloads_dir.exists():
+        raise HTTPException(status_code=404, detail="不存在")
+
+    # 检查 maker 已训练
+    output_dir = settings.output_dir / soul_name
+    has_persona = (output_dir / "persona.json").exists()
+    has_vectordb = (output_dir / "chroma_db").exists()
+    maker_trained = has_persona and has_vectordb
+
+    # 检查 voice-cloning 已切片
+    voice_datasets_dir = settings.base_dir.parent / "video-analysis-voice-cloning" / "datasets" / soul_name / "audio"
+    voice_cloned = voice_datasets_dir.exists() and any(voice_datasets_dir.glob("*.wav"))
+
+    # 统计文件
+    mp4_count = len(list(downloads_dir.glob("*.mp4")))
+    mp3_count = len(list(downloads_dir.glob("*.mp3")))
+    txt_count = len(list(downloads_dir.glob("*.txt")))
+    srt_count = len(list(downloads_dir.glob("*.srt")))
+    json_count = len(list(downloads_dir.glob("*.json")))
+
+    total_size = sum(f.stat().st_size for f in downloads_dir.rglob("*") if f.is_file())
+    total_size_mb = round(total_size / (1024 * 1024), 1)
+
+    return {
+        "can_archive": maker_trained and voice_cloned,
+        "maker_trained": maker_trained,
+        "voice_cloned": voice_cloned,
+        "file_stats": {
+            "mp4_count": mp4_count,
+            "mp3_count": mp3_count,
+            "txt_count": txt_count,
+            "srt_count": srt_count,
+            "json_count": json_count,
+            "total_size_mb": total_size_mb,
+        }
+    }
+
+
+@app.post("/api/maker/soul/{soul_name}/archive")
+async def archive_soul(soul_name: str):
+    """执行归档：将 downloads/soul_name 移动到 archive/soul_name"""
+    settings = get_settings()
+    downloads_dir = settings.downloads_dir / soul_name
+
+    if not downloads_dir.exists():
+        raise HTTPException(status_code=404, detail="不存在")
+
+    archive_base = settings.downloads_dir.parent / "archive"
+    archive_dir = archive_base / soul_name
+
+    if archive_dir.exists():
+        raise HTTPException(status_code=409, detail=f"归档目录已存在: archive/{soul_name}")
+
+    # 计算大小
+    total_size = sum(f.stat().st_size for f in downloads_dir.rglob("*") if f.is_file())
+    total_size_mb = round(total_size / (1024 * 1024), 1)
+
+    # 执行移动
+    archive_base.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(downloads_dir), str(archive_dir))
+    logger.info(f"Archived {soul_name}: {downloads_dir} -> {archive_dir}")
+
+    return {
+        "success": True,
+        "archived_to": f"archive/{soul_name}",
+        "size_mb": total_size_mb,
+    }
+
+
+@app.get("/api/maker/archived")
+async def list_archived():
+    """列出已归档的 soul"""
+    settings = get_settings()
+    archive_base = settings.downloads_dir.parent / "archive"
+
+    if not archive_base.exists():
+        return {"archived": []}
+
+    archived = []
+    for d in archive_base.iterdir():
+        if d.is_dir() and not d.name.startswith("."):
+            files = [f for f in d.rglob("*") if f.is_file()]
+            total_size = sum(f.stat().st_size for f in files)
+            archived.append({
+                "name": d.name,
+                "file_count": len(files),
+                "size_mb": round(total_size / (1024 * 1024), 1),
+            })
+
+    return {"archived": archived}
 
 
 def load_optimized_videos(output_dir: Path, soul_name: str):

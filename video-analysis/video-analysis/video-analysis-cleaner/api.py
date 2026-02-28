@@ -17,6 +17,7 @@ from config import DOWNLOADS_DIR, MODELS_DIR, WHISPER_MODEL
 from converter_service import (
     check_ffmpeg,
     convert_folder_stream,
+    cleanup_bad_mp4s_stream,
     get_folder_stats as get_converter_stats,
 )
 from transcriber_service import (
@@ -52,6 +53,7 @@ class ConvertRequest(BaseModel):
     """音频转换请求"""
     folder_name: str
     skip_existing: bool = True
+    vocal_separation: bool = False
 
 
 class TranscribeRequest(BaseModel):
@@ -226,7 +228,33 @@ async def convert_folder(request: ConvertRequest):
         raise HTTPException(status_code=500, detail="FFmpeg 不可用")
 
     async def generate():
-        async for event in convert_folder_stream(folder_path, request.skip_existing):
+        async for event in convert_folder_stream(folder_path, request.skip_existing, request.vocal_separation):
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+# ============================================================
+# 损坏文件清理接口
+# ============================================================
+
+@app.post("/api/cleaner/cleanup/{folder_name}")
+async def cleanup_bad_mp4s(folder_name: str):
+    """检测并删除损坏的 MP4 文件（流式返回进度）"""
+    folder_path = DOWNLOADS_DIR / folder_name
+
+    if not folder_path.exists():
+        raise HTTPException(status_code=404, detail="文件夹不存在")
+
+    async def generate():
+        async for event in cleanup_bad_mp4s_stream(folder_path):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(

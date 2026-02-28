@@ -470,6 +470,67 @@
               </div>
             </div>
           </div>
+
+          <!-- 归档区域 -->
+          <div v-if="archiveStatus" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
+            <div class="card-title">归档清理</div>
+
+            <div style="display: grid; gap: 0.5rem; margin-bottom: 1rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span class="status-dot" :class="archiveStatus.maker_trained ? 'online' : 'offline'"></span>
+                <span>Maker 已训练（persona + 向量库）</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span class="status-dot" :class="archiveStatus.voice_cloned ? 'online' : 'offline'"></span>
+                <span>Voice-Cloning 已切片（音频 WAV）</span>
+              </div>
+            </div>
+
+            <div v-if="archiveStatus.file_stats" style="background: var(--bg-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+              <div style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.5rem;">将归档的文件（downloads/{{ selectedSoul }}）</div>
+              <div style="display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.9rem;">
+                <span v-if="archiveStatus.file_stats.mp4_count">MP4: {{ archiveStatus.file_stats.mp4_count }}</span>
+                <span v-if="archiveStatus.file_stats.mp3_count">MP3: {{ archiveStatus.file_stats.mp3_count }}</span>
+                <span v-if="archiveStatus.file_stats.txt_count">TXT: {{ archiveStatus.file_stats.txt_count }}</span>
+                <span v-if="archiveStatus.file_stats.srt_count">SRT: {{ archiveStatus.file_stats.srt_count }}</span>
+                <span v-if="archiveStatus.file_stats.json_count">JSON: {{ archiveStatus.file_stats.json_count }}</span>
+                <span style="color: var(--warning-color); font-weight: 600;">共 {{ archiveStatus.file_stats.total_size_mb }} MB</span>
+              </div>
+            </div>
+
+            <button
+              class="btn"
+              :class="archiveStatus.can_archive ? 'btn-secondary' : ''"
+              :disabled="archiving || !archiveStatus.can_archive"
+              @click="doArchive"
+              :style="!archiveStatus.can_archive ? 'background: var(--border-color); color: var(--text-muted);' : ''"
+            >
+              <span v-if="archiving" class="spinner"></span>
+              {{ archiving ? '归档中...' : (archiveStatus.can_archive ? '归档到 archive/' : '条件未满足，无法归档') }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 已归档列表 -->
+        <div v-if="archivedList.length > 0" class="card" style="opacity: 0.75;">
+          <div class="card-title">已归档</div>
+          <div class="soul-list">
+            <div
+              v-for="item in archivedList"
+              :key="item.name"
+              class="soul-item"
+              style="cursor: default; border-color: transparent;"
+            >
+              <div>
+                <div class="soul-name" style="color: var(--text-muted);">{{ item.name }}</div>
+                <div class="soul-stats">
+                  <span>{{ item.file_count }} 个文件</span>
+                  <span>{{ item.size_mb }} MB</span>
+                </div>
+              </div>
+              <span class="badge" style="background: var(--border-color); color: var(--text-muted);">已归档</span>
+            </div>
+          </div>
         </div>
       </template>
     </div>
@@ -494,6 +555,10 @@
             trainingDone: false,
             steps: [],
             soulDetail: null,
+
+            archiveStatus: null,
+            archiving: false,
+            archivedList: [],
           };
         },
         mounted: function() {
@@ -508,6 +573,7 @@
                 vm.serviceOnline = true;
                 vm.statusInfo = data;
                 vm.loadSouls();
+                vm.loadArchivedList();
               })
               .catch(function() {
                 vm.serviceOnline = false;
@@ -526,11 +592,13 @@
             this.steps = [];
             this.trainingDone = false;
             this.soulDetail = null;
+            this.archiveStatus = null;
 
-            // 如果已训练，加载详情
+            // 如果已训练，加载详情和归档状态
             var soul = this.souls.find(function(b) { return b.name === name; });
             if (soul && soul.trained) {
               this.loadSoulDetail(name);
+              this.loadArchiveStatus(name);
             }
           },
 
@@ -627,7 +695,54 @@
               vm.trainingDone = true;
               vm.loadSouls();
               vm.loadSoulDetail(vm.selectedSoul);
+              vm.loadArchiveStatus(vm.selectedSoul);
             }
+          },
+
+          loadArchiveStatus: function(name) {
+            var vm = this;
+            fetch(API + '/soul/' + encodeURIComponent(name) + '/archive-status')
+              .then(function(r) { return r.json(); })
+              .then(function(data) { vm.archiveStatus = data; })
+              .catch(function() { vm.archiveStatus = null; });
+          },
+
+          loadArchivedList: function() {
+            var vm = this;
+            fetch(API + '/archived')
+              .then(function(r) { return r.json(); })
+              .then(function(data) { vm.archivedList = data.archived; })
+              .catch(function() { vm.archivedList = []; });
+          },
+
+          doArchive: function() {
+            var vm = this;
+            if (!confirm('确认将 downloads/' + vm.selectedSoul + ' 归档到 archive/ 目录？\n归档后该 soul 将从列表中消失。')) {
+              return;
+            }
+            vm.archiving = true;
+            fetch(API + '/soul/' + encodeURIComponent(vm.selectedSoul) + '/archive', {
+              method: 'POST',
+            })
+              .then(function(r) {
+                if (!r.ok) return r.json().then(function(d) { throw new Error(d.detail); });
+                return r.json();
+              })
+              .then(function(data) {
+                vm.archiving = false;
+                alert('归档成功！已移动 ' + data.size_mb + ' MB 到 ' + data.archived_to);
+                vm.selectedSoul = null;
+                vm.soulDetail = null;
+                vm.archiveStatus = null;
+                vm.trainingDone = false;
+                vm.steps = [];
+                vm.loadSouls();
+                vm.loadArchivedList();
+              })
+              .catch(function(err) {
+                vm.archiving = false;
+                alert('归档失败: ' + err.message);
+              });
           },
         },
       });

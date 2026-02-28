@@ -39,14 +39,21 @@ async def greeting_flow(state: SoulState, **deps) -> dict:
     user_name = state.get("user_name", "朋友")
     system_prompt = state.get("system_prompt", "")
 
-    greeting_instruction = f"""你正在和{user_name}打招呼。
-用户状态: {absence_category}
-{'这是新用户，第一次来找你聊天。' if absence_category == 'new_user' else ''}
-{'今天已经聊过了，用户又回来了。' if absence_category == 'same_day' else ''}
-{'用户几天没来了，表示关心。' if absence_category == 'short_absence' else ''}
-{'用户很久没来了，表示热情欢迎。' if absence_category == 'long_absence' else ''}
+    # 根据用户状态构建不同的打招呼指引
+    status_guides = {
+        "new_user": f"这是{user_name}第一次来找你聊天。用热情但不过度的方式欢迎，可以简单介绍自己，让对方感到轻松。不要问太多问题，先让对方适应。",
+        "same_day": f"{user_name}今天已经和你聊过了，现在又回来了。用轻松随意的语气，像老朋友回来继续聊一样，可以接上之前的话题或者简单问一句。",
+        "short_absence": f"{user_name}有几天没来了。表达一下你注意到对方有段时间没来，自然地表示关心，但不要夸张。",
+        "long_absence": f"{user_name}很久没来了。热情欢迎回来，可以调侃一下对方'消失'了这么久，语气亲切自然。",
+    }
 
-请用你的风格打个招呼，简短自然。"""
+    greeting_instruction = f"""{status_guides.get(absence_category, '')}
+
+要求：
+- 用你自己的说话风格和口头禅，保持人设一致
+- 简短自然，1-2句话即可，不要长篇大论
+- 像真人聊天一样，不要过于正式
+- 可以使用你习惯的开场白"""
 
     response = await generation_service.generate(
         system_prompt=system_prompt,

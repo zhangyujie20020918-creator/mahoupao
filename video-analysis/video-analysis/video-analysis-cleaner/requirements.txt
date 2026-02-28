@@ -3,7 +3,8 @@
 # Install: pip install -r requirements.txt
 # For CPU version: python install.py
 
---extra-index-url https://download.pytorch.org/whl/cu121
+--index-url https://download.pytorch.org/whl/cu121
+--extra-index-url https://pypi.org/simple/
 
 # Web framework
 fastapi>=0.104.0
@@ -11,9 +12,10 @@ uvicorn>=0.24.0
 
 # Audio processing
 pydub>=0.25.1
+demucs>=4.0.0
 
 # PyTorch (for GPU detection, cu121 = CUDA 12.1)
-torch>=2.0.0+cu121
+torch>=2.0.0
 
 # ASR speech recognition (GPU accelerated)
 faster-whisper>=0.10.0

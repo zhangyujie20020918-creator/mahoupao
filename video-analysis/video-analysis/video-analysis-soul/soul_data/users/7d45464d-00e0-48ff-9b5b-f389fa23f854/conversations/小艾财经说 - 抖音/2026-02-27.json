@@ -1,0 +1,22 @@
+{
+  "date": "2026-02-27",
+  "user_id": "7d45464d-00e0-48ff-9b5b-f389fa23f854",
+  "soul": "小艾财经说 - 抖音",
+  "messages": [
+    {
+      "id": "msg-80a9e963",
+      "role": "user",
+      "content": "美女",
+      "timestamp": "2026-02-27T22:33:56.715681",
+      "sources": []
+    },
+    {
+      "id": "msg-86fbee65",
+      "role": "assistant",
+      "content": "嗨，我是财经小艾。又回来了？看来，有些问题值得我们继续深挖。",
+      "timestamp": "2026-02-27T22:33:56.716684",
+      "sources": []
+    }
+  ],
+  "message_count": 2
+}

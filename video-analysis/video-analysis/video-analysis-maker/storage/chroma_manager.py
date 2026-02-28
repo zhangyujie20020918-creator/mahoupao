@@ -140,16 +140,22 @@ class ChromaManager:
         logger.info(f"Generating embeddings for {len(all_texts)} segments...")
         embeddings = self.embedder.encode(all_texts)
 
-        # 批量添加到 ChromaDB
-        logger.info(f"Adding {len(all_texts)} documents to ChromaDB...")
-        self.collection.add(
-            ids=all_ids,
-            embeddings=embeddings,
-            documents=all_texts,
-            metadatas=all_metadatas
-        )
+        # 分批添加到 ChromaDB（ChromaDB 单次添加有数量上限）
+        batch_size = 5000
+        total = len(all_texts)
+        logger.info(f"Adding {total} documents to ChromaDB in batches of {batch_size}...")
 
-        logger.info(f"Successfully added {len(all_texts)} documents to collection {self.collection_name}")
+        for i in range(0, total, batch_size):
+            end = min(i + batch_size, total)
+            self.collection.add(
+                ids=all_ids[i:end],
+                embeddings=embeddings[i:end],
+                documents=all_texts[i:end],
+                metadatas=all_metadatas[i:end]
+            )
+            logger.info(f"  Added batch {i // batch_size + 1}: documents {i+1}-{end}")
+
+        logger.info(f"Successfully added {total} documents to collection {self.collection_name}")
 
     def search(
         self,

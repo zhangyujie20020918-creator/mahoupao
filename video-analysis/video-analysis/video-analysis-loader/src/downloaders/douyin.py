@@ -35,6 +35,7 @@ class DouyinDownloader(IDownloader):
     # ========== 反爬配置 ==========
     # 最大单次延迟 2.5 秒
     SCROLL_DELAY = (1.0, 2.0)       # 滚动间隔（秒）
+    SCROLL_RETRY_DELAY = (5.0, 8.0)  # 无新内容时的重试等待（秒），页面加载慢时需要更久
     PAGE_LOAD_DELAY = (1.5, 2.5)    # 页面加载后等待（秒）
     VIDEO_INTERVAL = (0.8, 1.8)     # 视频之间间隔（秒）
 
@@ -931,12 +932,18 @@ class DouyinDownloader(IDownloader):
                         if no_change_rounds >= 3:
                             print(f"[抖音下载] 连续3次无新内容，停止滚动")
                             break
+                        # 页面加载慢时，等久一点再重试
+                        print(f"[抖音下载] 未发现新内容，等待页面加载 ({no_change_rounds}/3)...")
+                        await page.wait_for_timeout(self._random_delay(self.SCROLL_RETRY_DELAY))
+                        continue
                     else:
                         no_change_rounds = 0
                     prev_count = current_count
 
-                    # 向下滚动
-                    await safe_evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                    # 模拟真实用户滚动 - 先将鼠标移到页面中央，再触发 wheel 事件
+                    await page.mouse.move(random.randint(900, 1100), random.randint(550, 700))
+                    delta_y = random.randint(800, 1500)
+                    await page.mouse.wheel(0, delta_y)
                     await page.wait_for_timeout(self._random_delay(self.SCROLL_DELAY))
 
                 # 最终提取一次
@@ -1118,11 +1125,17 @@ class DouyinDownloader(IDownloader):
                         no_change_rounds += 1
                         if no_change_rounds >= 3:
                             break
+                        print(f"[抖音下载] 未发现新内容，等待页面加载 ({no_change_rounds}/3)...")
+                        await page.wait_for_timeout(self._random_delay(self.SCROLL_RETRY_DELAY))
+                        continue
                     else:
                         no_change_rounds = 0
                     prev_count = current_count
 
-                    await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                    # 模拟真实用户滚动 - 先将鼠标移到页面中央，再触发 wheel 事件
+                    await page.mouse.move(random.randint(900, 1100), random.randint(550, 700))
+                    delta_y = random.randint(800, 1500)
+                    await page.mouse.wheel(0, delta_y)
                     await page.wait_for_timeout(self._random_delay(self.SCROLL_DELAY))
 
                 # 最终提取

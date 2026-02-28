@@ -26,6 +26,7 @@ class Settings(BaseSettings):
 
     # Processing Settings
     batch_size: int = 5  # 每批处理的视频数量
+    analysis_chunk_size: int = 30  # 人物分析时每批处理的视频数量
     context_window: int = 2  # 检索时扩展的上下文段落数
 
     class Config:

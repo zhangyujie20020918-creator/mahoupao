@@ -160,6 +160,7 @@ class DownloadService(IDownloadService):
 
         # ========== 反爬配置 ==========
         SCROLL_DELAY = (1.0, 2.0)
+        SCROLL_RETRY_DELAY = (5.0, 8.0)  # 无新内容时的重试等待
         PAGE_LOAD_DELAY = (1.5, 2.5)
         VIDEO_INTERVAL = (0.8, 1.8)
         DOWNLOAD_INTERVAL = (0.3, 1.0)
@@ -212,6 +213,42 @@ class DownloadService(IDownloadService):
                         return True, file_path.stat().st_size, ""
             except Exception as e:
                 return False, 0, str(e)
+
+        async def download_subtitle(aweme_detail: dict, srt_path: Path) -> bool:
+            """从 aweme_detail 中提取字幕并保存为 SRT 文件"""
+            # 抖音字幕在 video_subtitle 或 caption_infos 字段
+            subtitle_url = None
+            for field in ["video_subtitle", "caption_infos"]:
+                items = aweme_detail.get(field)
+                if not items or not isinstance(items, list):
+                    continue
+                for item in items:
+                    url = item.get("Url") or item.get("url") or item.get("subtitle_url")
+                    if url:
+                        subtitle_url = url
+                        break
+                if subtitle_url:
+                    break
+
+            if not subtitle_url:
+                return False
+
+            try:
+                headers = {
+                    "User-Agent": get_random_ua(),
+                    "Referer": "https://www.douyin.com/",
+                }
+                async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=30) as client:
+                    resp = await client.get(subtitle_url)
+                    resp.raise_for_status()
+                    content = resp.text
+                    if content.strip():
+                        with open(srt_path, "w", encoding="utf-8") as f:
+                            f.write(content)
+                        return True
+            except Exception as e:
+                print(f"[字幕] 下载失败: {e}")
+            return False
 
         print(f"\n{'='*60}")
         print(f"[用户主页下载] 开始处理: {user_url}")
@@ -285,15 +322,27 @@ class DownloadService(IDownloadService):
 
             async def check_login_status() -> bool:
                 try:
-                    login_btn = await page.query_selector('button:has-text("Login"), a:has-text("Login"), div[class*="login-btn"], button[class*="login"]')
+                    # 检测中文/英文登录按钮
+                    login_btn = await page.query_selector(
+                        'button:has-text("登录"), a:has-text("登录"), '
+                        'button:has-text("Login"), a:has-text("Login"), '
+                        'div[class*="login-btn"], button[class*="login"], '
+                        'div[class*="login-guide"]'
+                    )
                     if login_btn and await login_btn.is_visible():
                         return False
-                    avatar = await page.query_selector('img[class*="avatar"], div[class*="avatar"]')
+                    # 检测头像（已登录标志）
+                    avatar = await page.query_selector(
+                        'img[class*="avatar"], div[class*="avatar"], '
+                        'img[class*="Avatar"], div[class*="Avatar"]'
+                    )
                     if avatar and await avatar.is_visible():
                         return True
-                    return False
+                    # 既没有登录按钮也没有头像时，默认视为已登录
+                    # 避免选择器不匹配时误报未登录
+                    return True
                 except Exception:
-                    return False
+                    return True
 
             async def save_debug_info(reason: str = "unknown"):
                 timestamp = int(time.time())
@@ -495,6 +544,42 @@ class DownloadService(IDownloadService):
             except Exception:
                 work_count = 0
 
+            # 滚动前：保存页面快照 + 检测可滚动元素
+            await save_debug_info("before_scroll")
+            try:
+                scroll_debug = await page.evaluate('''() => {
+                    const results = [];
+                    // 检查哪些元素可以滚动
+                    const candidates = [
+                        document.scrollingElement,
+                        document.documentElement,
+                        document.body,
+                        ...document.querySelectorAll('[class*="user-tab-content"]'),
+                        ...document.querySelectorAll('div[class*="userNewUi"]'),
+                        ...document.querySelectorAll('[class*="container"]'),
+                        ...document.querySelectorAll('main'),
+                    ];
+                    for (const el of candidates) {
+                        if (!el) continue;
+                        const tag = el.tagName || 'unknown';
+                        const cls = (el.className || '').toString().substring(0, 80);
+                        const sh = el.scrollHeight;
+                        const ch = el.clientHeight;
+                        const st = el.scrollTop;
+                        const ov = getComputedStyle(el).overflow + '/' + getComputedStyle(el).overflowY;
+                        if (sh > ch + 10) {
+                            results.push(`SCROLLABLE ${tag} cls="${cls}" scrollH=${sh} clientH=${ch} scrollTop=${st} overflow=${ov}`);
+                        } else {
+                            results.push(`NOT-SCROLLABLE ${tag} cls="${cls}" scrollH=${sh} clientH=${ch} overflow=${ov}`);
+                        }
+                    }
+                    return results;
+                }''')
+                for line in scroll_debug:
+                    print(f"[滚动调试] {line}")
+            except Exception as e:
+                print(f"[滚动调试] 检测失败: {e}")
+
             # 滚动加载
             print(f"[步骤1] 正在滚动加载视频列表...")
             prev_count = 0
@@ -522,13 +607,15 @@ class DownloadService(IDownloadService):
                         if work_count and current_count < work_count:
                             print(f"[警告] 滚动后无法加载更多视频（可能需要登录）")
                         break
+                    print(f"[步骤1] 未发现新内容，等待页面加载 ({no_change_rounds}/5)...")
+                    await page.wait_for_timeout(random_delay(SCROLL_RETRY_DELAY))
+                    continue
                 prev_count = current_count
 
-                scroll_type = random.choice(['full', 'partial', 'partial'])
-                if scroll_type == 'partial':
-                    await page.evaluate(f'window.scrollTo(0, document.body.scrollHeight * {random.uniform(0.6, 0.9)})')
-                else:
-                    await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                # 模拟真实用户滚动 - 先将鼠标移到页面中央，再触发 wheel 事件
+                await page.mouse.move(random.randint(900, 1100), random.randint(550, 700))
+                delta_y = random.randint(600, 1800)
+                await page.mouse.wheel(0, delta_y)
 
                 await page.wait_for_timeout(random_delay(SCROLL_DELAY))
 
@@ -671,18 +758,28 @@ class DownloadService(IDownloadService):
                         yield {"type": "downloaded", "index": idx, "total": video_count, "title": title, "success": False, "error": "无法获取下载地址", "permanently_failed": True}
                         continue
 
+                    # 从URL提取视频ID，用于文件名去重
+                    video_id_match = re.search(r'/video/(\d+)', video_url)
+                    video_id = video_id_match.group(1)[-8:] if video_id_match else ""
+
                     # 检查文件是否已存在
                     safe_title = re.sub(r'[\s\\/*?:"<>|]', "_", title).strip("_")[:80]
                     if not safe_title.strip():
                         safe_title = f"douyin_{idx}"
-                    file_path = user_folder / f"{safe_title}.mp4"
+                    # 文件名加上视频ID后缀，避免同名视频冲突
+                    filename = f"{safe_title}_{video_id}.mp4" if video_id else f"{safe_title}.mp4"
+                    file_path = user_folder / filename
 
-                    if file_path.exists():
-                        print(f"[视频 {idx}/{video_count}] 文件已存在，跳过: {file_path.name}")
+                    # 兼容旧文件名（无ID后缀）
+                    old_file_path = user_folder / f"{safe_title}.mp4"
+
+                    if file_path.exists() or (old_file_path.exists() and old_file_path != file_path):
+                        existing = file_path if file_path.exists() else old_file_path
+                        print(f"[视频 {idx}/{video_count}] 文件已存在，跳过: {existing.name}")
                         skipped_count += 1
                         downloaded_urls.add(video_url)
-                        downloaded_videos_info.append({"url": video_url, "title": title, "success": True, "skipped": True, "file_path": str(file_path)})
-                        yield {"type": "downloaded", "index": idx, "total": video_count, "title": title, "success": True, "skipped": True, "file_path": str(file_path)}
+                        downloaded_videos_info.append({"url": video_url, "title": title, "success": True, "skipped": True, "file_path": str(existing)})
+                        yield {"type": "downloaded", "index": idx, "total": video_count, "title": title, "success": True, "skipped": True, "file_path": str(existing)}
                         continue
 
                     print(f"[视频 {idx}/{video_count}] 正在下载: {title[:30]}...")
@@ -693,6 +790,13 @@ class DownloadService(IDownloadService):
                         downloaded_urls.add(video_url)
                         downloaded_videos_info.append({"url": video_url, "title": title, "success": True, "file_path": str(file_path)})
                         print(f"[视频 {idx}/{video_count}] ✓ 下载成功: {format_size(file_size)}")
+
+                        # 尝试提取字幕
+                        srt_path = file_path.with_suffix(".srt")
+                        has_subtitle = await download_subtitle(video_data, srt_path)
+                        if has_subtitle:
+                            print(f"[视频 {idx}/{video_count}] ✓ 字幕已保存: {srt_path.name}")
+
                         yield {
                             "type": "downloaded",
                             "index": idx,
@@ -701,6 +805,7 @@ class DownloadService(IDownloadService):
                             "success": True,
                             "file_path": str(file_path),
                             "file_size_human": format_size(file_size),
+                            "has_subtitle": has_subtitle,
                             "succeeded_so_far": succeeded_count,
                             "remaining": video_count - succeeded_count - len(failed_list) - skipped_count,
                         }
@@ -763,7 +868,8 @@ class DownloadService(IDownloadService):
                 # 滚动加载所有视频
                 print(f"[重试] 滚动加载视频列表...")
                 for _ in range(30):
-                    await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                    await page.mouse.move(random.randint(900, 1100), random.randint(550, 700))
+                    await page.mouse.wheel(0, random.randint(600, 1800))
                     await page.wait_for_timeout(random_delay(SCROLL_DELAY))
                     hrefs = await page.evaluate(extract_js)
                     if work_count and len(hrefs) >= work_count:
