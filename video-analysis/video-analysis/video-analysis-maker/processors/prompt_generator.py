@@ -27,7 +27,6 @@ class SoulPersona:
     interaction_style: str       # 与粉丝的互动方式
     anti_patterns: List[str]     # 绝对不会做的事
     system_prompt: str           # 生成的系统 prompt
-    evaluation: Optional[Dict[str, Any]] = None  # 质量评估结果
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -36,83 +35,6 @@ class SoulPersona:
 class PromptGenerator:
     """分析风格并生成模拟 prompt"""
 
-    # ── 单批次轻量分析提示词（用于 chunk 分析） ──────────────────────
-    CHUNK_ANALYSIS_PROMPT = """你是一个专业的人物画像分析师。请分析以下博主的视频文本，提取原始特征观察。
-
-## 博主名称：{soul_name}
-
-## 视频文本（本批共 {chunk_size} 条，总共 {total_videos} 条）：
----
-{video_texts}
----
-
-## 任务
-只做**观察记录**，不做综合分析。对每个维度：
-- 摘录原文例句作为依据
-- 标注该特征出现在哪些视频中
-
-请以 JSON 格式输出：
-{{
-    "speaking_patterns": ["观察到的说话模式，附原文例句"],
-    "tone_observations": ["语气特征观察，附原文例句"],
-    "common_phrases": {{
-        "opening": ["开场白原文摘录"],
-        "closing": ["结束语原文摘录"],
-        "catchphrases": ["口头禅原文摘录"],
-        "transition_words": ["转折/衔接词组"],
-        "rhetorical_devices": ["修辞手法"]
-    }},
-    "topic_keywords": ["涉及的具体话题关键词"],
-    "personality_signals": ["性格信号，附行为依据"],
-    "audience_clues": ["目标受众线索"],
-    "content_structure": ["内容组织模式观察"],
-    "argumentation_patterns": ["论证方式观察"],
-    "emotion_expressions": ["情绪表达观察"],
-    "interaction_clues": ["与观众互动方式的线索"],
-    "anti_pattern_signals": ["此人明确回避的行为"]
-}}
-
-只返回 JSON，不要其他内容："""
-
-    # ── 综合合并提示词（将多批次结果合并） ──────────────────────
-    SYNTHESIS_PROMPT = """你是一个专业的人物画像分析师。以下是对博主 **{soul_name}** 共 {total_videos} 条视频分 {chunk_count} 批分析的原始结果。
-
-请综合所有批次，提炼出**稳定、可靠的人物特征**。
-
-## 关键指令
-- **只保留跨批次反复出现的稳定特征**，剔除仅出现一次的偶发特征
-- 口头禅和常用语必须是**原文摘录**，不得改写
-- 如果某个维度依据不足，如实说明
-
-## 各批次分析结果：
-{chunk_results_json}
-
-## 输出格式
-
-请以 JSON 格式输出（与完整分析格式一致）：
-{{
-    "speaking_style": "详细的说话风格描述。包含：(1)句式偏好 (2)信息密度 (3)表达节奏",
-    "tone": "语气的层次变化描述，描述完整的语气弧线",
-    "common_phrases": {{
-        "opening": ["跨批次反复出现的开场白，原文摘录"],
-        "closing": ["跨批次反复出现的结束语，原文摘录"],
-        "catchphrases": ["高频口头禅，至少5-8个，原文摘录，标注出现频率（高频/中频）"],
-        "transition_words": ["常用转折/衔接词组"],
-        "rhetorical_devices": ["标志性修辞手法"]
-    }},
-    "topic_expertise": ["具体细分的专业领域，按熟悉度排序"],
-    "personality_traits": ["性格特点，每条包含具体行为表现"],
-    "target_audience": "目标受众的具体画像",
-    "content_patterns": "内容组织的固定套路，用编号步骤描述",
-    "argumentation_style": "论证方式的具体描述",
-    "emotional_range": "情绪表达的完整图谱",
-    "interaction_style": "与观众/粉丝的互动方式",
-    "anti_patterns": ["此人绝对不会做的事情"]
-}}
-
-只返回 JSON，不要其他内容："""
-
-    # ── 完整分析提示词（单 chunk 时直接使用） ──────────────────────
     ANALYSIS_PROMPT = """你是一个专业的人物画像分析师。请深度分析以下博主的视频文本，提炼出能够精准还原此人说话方式的特征画像。
 
 ## 分析目标
@@ -162,7 +84,6 @@ class PromptGenerator:
 
 只返回 JSON，不要其他内容："""
 
-    # ── Persona 生成提示词 ──────────────────────
     PERSONA_PROMPT_TEMPLATE = """你是一个专业的 AI 角色设计师。基于以下博主的深度分析结果，生成一个高质量的系统 prompt，用于让 AI **在一对一对话中**精准模拟此人。
 
 ## 重要背景
@@ -234,37 +155,15 @@ class PromptGenerator:
 **绝对不要做的事：**
 （列出明确的禁忌行为约束，如"不要表现犹豫"、"不要使用你从未在视频中用过的口头禅"、"不要承认自己是AI"等。）
 
+## 质量检查清单
+生成前请自检：
+- [ ] 所有口头禅和常用语是否来自原文，没有被改写？
+- [ ] 风格描述是否足够具体，还是仍有"专业且亲切"这类空泛表达？
+- [ ] 是否区分了对话场景和视频独白场景？
+- [ ] 内容组织模式是否包含了简单问题的简短回复策略？
+- [ ] 绝对不要做的事是否足够明确？
+
 直接输出系统 prompt 内容，不需要额外说明："""
-
-    # ── 自评估提示词 ──────────────────────
-    EVALUATION_PROMPT = """请评估以下为博主 **{soul_name}** 生成的系统 prompt 的质量。
-
-## 系统 Prompt：
----
-{system_prompt}
----
-
-## 原始分析数据（用于对比验证）：
-{analysis_json}
-
-## 评估维度（每项 1-5 分）
-
-1. **结构完整性**：骨架章节是否齐全，有无遗漏
-2. **口头禅真实性**：常用语/口头禅是否来自原文摘录，有无被改写或编造
-3. **风格具体性**：风格描述是否足够具体可模仿，还是空泛的形容词堆砌
-4. **对话适配性**：是否针对一对一对话场景做了调整，而非照搬视频独白风格
-
-请以 JSON 格式输出：
-{{
-    "structure_completeness": {{"score": 1-5, "issues": ["具体问题"]}},
-    "catchphrase_authenticity": {{"score": 1-5, "issues": ["具体问题"]}},
-    "style_specificity": {{"score": 1-5, "issues": ["具体问题"]}},
-    "conversation_adaptation": {{"score": 1-5, "issues": ["具体问题"]}},
-    "overall_score": 1-5,
-    "summary": "一句话总结"
-}}
-
-只返回 JSON，不要其他内容："""
 
     def __init__(self):
         self.settings = get_settings()
@@ -272,45 +171,49 @@ class PromptGenerator:
         self.model = genai.GenerativeModel(self.settings.gemini_model)
         logger.info(f"PromptGenerator initialized with model: {self.settings.gemini_model}")
 
-    # ── 核心公开方法 ──────────────────────
-
     def analyze_soul(self, videos: List[OptimizedVideo]) -> Optional[Dict[str, Any]]:
         """
-        分析的说话风格和特征（支持多轮分析）
+        分析的说话风格和特征
 
-        全部视频 → 分 chunk → 逐批分析 → 综合合并 → 结果
-        如果只有 1 个 chunk，直接用完整的 ANALYSIS_PROMPT
+        Args:
+            videos: 的视频列表
+
+        Returns:
+            分析结果字典
         """
         if not videos:
             logger.warning("No videos provided for analysis")
             return None
 
         soul_name = videos[0].soul_name
-        chunk_size = self.settings.analysis_chunk_size
 
-        # 分 chunk
-        chunks = [videos[i:i + chunk_size] for i in range(0, len(videos), chunk_size)]
-        logger.info(f"Analyzing {len(videos)} videos in {len(chunks)} chunk(s) "
-                     f"(chunk_size={chunk_size}) for {soul_name}")
+        # 组合所有视频文本
+        video_texts = "\n\n".join([
+            f"【{v.video_title}】\n{v.optimized_full_text}"
+            for v in videos[:10]  # 最多取10个视频避免超过token限制
+        ])
 
-        if len(chunks) == 1:
-            # 单 chunk：直接用完整分析提示词
-            return self._analyze_full(soul_name, chunks[0])
+        try:
+            prompt = self.ANALYSIS_PROMPT.format(
+                soul_name=soul_name,
+                video_texts=video_texts
+            )
 
-        # 多 chunk：逐批轻量分析 → 综合合并
-        chunk_results = []
-        for i, chunk in enumerate(chunks):
-            logger.info(f"Analyzing chunk {i + 1}/{len(chunks)} ({len(chunk)} videos)")
-            result = self._analyze_chunk(soul_name, chunk, len(videos))
-            if result:
-                chunk_results.append(result)
+            response = self.model.generate_content(prompt)
+            result_text = response.text.strip()
 
-        if not chunk_results:
-            logger.error(f"All chunk analyses failed for {soul_name}")
+            # 清理可能的 markdown 代码块
+            if result_text.startswith("```"):
+                lines = result_text.split("\n")
+                result_text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+
+            analysis = json.loads(result_text)
+            logger.info(f"Successfully analyzed soul: {soul_name}")
+            return analysis
+
+        except Exception as e:
+            logger.error(f"Error analyzing soul {soul_name}: {e}")
             return None
-
-        # 综合合并
-        return self._synthesize_chunks(soul_name, chunk_results, len(videos))
 
     def generate_persona_prompt(
         self,
@@ -318,9 +221,22 @@ class PromptGenerator:
         analysis: Dict[str, Any],
         sample_videos: List[OptimizedVideo]
     ) -> str:
-        """生成模拟的系统 prompt"""
-        # 智能样本选取
-        sample_texts = self._select_diverse_samples(sample_videos)
+        """
+        生成模拟的系统 prompt
+
+        Args:
+            soul_name: 名称
+            analysis: 分析结果
+            sample_videos: 示例视频
+
+        Returns:
+            系统 prompt
+        """
+        # 准备示例文本（取更多样本，每个截取更长的片段以保留完整语感）
+        sample_texts = "\n\n".join([
+            f"【{v.video_title}】\n{v.optimized_full_text[:800]}..."
+            for v in sample_videos[:5]
+        ])
 
         try:
             # 处理 common_phrases：可能是 dict（新格式）或 list（旧格式）
@@ -361,221 +277,9 @@ class PromptGenerator:
             logger.error(f"Error generating persona prompt: {e}")
             return self._generate_fallback_prompt(soul_name, analysis)
 
-    def create_soul_persona(self, videos: List[OptimizedVideo]) -> Optional[SoulPersona]:
-        """创建完整的人格画像"""
-        if not videos:
-            return None
-
-        soul_name = videos[0].soul_name
-
-        # 分析（多轮）
-        analysis = self.analyze_soul(videos)
-        if not analysis:
-            return None
-
-        # 生成系统 prompt
-        system_prompt = self.generate_persona_prompt(soul_name, analysis, videos)
-
-        # 自评估
-        evaluation = self._evaluate_and_improve(soul_name, system_prompt, analysis)
-
-        # 创建人格画像
-        persona = SoulPersona(
-            soul_name=soul_name,
-            speaking_style=analysis.get("speaking_style", ""),
-            common_phrases=analysis.get("common_phrases", []),
-            topic_expertise=analysis.get("topic_expertise", []),
-            personality_traits=analysis.get("personality_traits", []),
-            tone=analysis.get("tone", ""),
-            target_audience=analysis.get("target_audience", ""),
-            content_patterns=analysis.get("content_patterns", ""),
-            argumentation_style=analysis.get("argumentation_style", ""),
-            emotional_range=analysis.get("emotional_range", ""),
-            interaction_style=analysis.get("interaction_style", ""),
-            anti_patterns=analysis.get("anti_patterns", []),
-            system_prompt=system_prompt,
-            evaluation=evaluation
-        )
-
-        return persona
-
-    def save_persona(self, persona: SoulPersona, output_dir: Path):
-        """保存人格画像（common_phrases 扁平化为 List[str] 以兼容 Soul 端）"""
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        # 转换为 dict 并扁平化 common_phrases
-        persona_dict = persona.to_dict()
-        persona_dict["common_phrases"] = self._flatten_common_phrases(
-            persona_dict.get("common_phrases", [])
-        )
-
-        # 保存完整的人格画像（JSON）
-        persona_path = output_dir / "persona.json"
-        with open(persona_path, "w", encoding="utf-8") as f:
-            json.dump(persona_dict, f, ensure_ascii=False, indent=2)
-
-        # 单独保存系统 prompt（方便使用）
-        prompt_path = output_dir / "system_prompt.txt"
-        with open(prompt_path, "w", encoding="utf-8") as f:
-            f.write(persona.system_prompt)
-
-        logger.info(f"Saved persona for {persona.soul_name} to {output_dir}")
-
-    # ── 内部分析方法 ──────────────────────
-
-    def _analyze_full(self, soul_name: str, videos: List[OptimizedVideo]) -> Optional[Dict[str, Any]]:
-        """单 chunk 完整分析（视频数 <= chunk_size 时使用）"""
-        video_texts = "\n\n".join([
-            f"【{v.video_title}】\n{v.optimized_full_text}"
-            for v in videos
-        ])
-
-        try:
-            prompt = self.ANALYSIS_PROMPT.format(
-                soul_name=soul_name,
-                video_texts=video_texts
-            )
-
-            result_text = self._call_model(prompt)
-            analysis = json.loads(result_text)
-            logger.info(f"Successfully analyzed soul (full): {soul_name}")
-            return analysis
-
-        except Exception as e:
-            logger.error(f"Error analyzing soul {soul_name}: {e}")
-            return None
-
-    def _analyze_chunk(
-        self, soul_name: str, chunk: List[OptimizedVideo], total_videos: int
-    ) -> Optional[Dict[str, Any]]:
-        """分析单个视频批次"""
-        video_texts = "\n\n".join([
-            f"【{v.video_title}】\n{v.optimized_full_text}"
-            for v in chunk
-        ])
-
-        try:
-            prompt = self.CHUNK_ANALYSIS_PROMPT.format(
-                soul_name=soul_name,
-                chunk_size=len(chunk),
-                total_videos=total_videos,
-                video_texts=video_texts
-            )
-
-            result_text = self._call_model(prompt)
-            return json.loads(result_text)
-
-        except Exception as e:
-            logger.error(f"Error analyzing chunk for {soul_name}: {e}")
-            return None
-
-    def _synthesize_chunks(
-        self, soul_name: str, chunk_results: List[Dict], total_videos: int
-    ) -> Optional[Dict[str, Any]]:
-        """合并所有批次的分析结果"""
-        try:
-            prompt = self.SYNTHESIS_PROMPT.format(
-                soul_name=soul_name,
-                total_videos=total_videos,
-                chunk_count=len(chunk_results),
-                chunk_results_json=json.dumps(chunk_results, ensure_ascii=False, indent=2)
-            )
-
-            result_text = self._call_model(prompt)
-            analysis = json.loads(result_text)
-            logger.info(f"Successfully synthesized {len(chunk_results)} chunks for {soul_name}")
-            return analysis
-
-        except Exception as e:
-            logger.error(f"Error synthesizing chunks for {soul_name}: {e}")
-            # 降级：用第一个 chunk 的结果尝试构造
-            return None
-
-    # ── 智能样本选取 ──────────────────────
-
-    @staticmethod
-    def _select_diverse_samples(videos: List[OptimizedVideo], num_samples: int = 6) -> str:
-        """
-        等间距选取视频样本，每个视频截取 开头+中间+结尾 以捕获完整语感。
-        """
-        if not videos:
-            return ""
-
-        total = len(videos)
-        if total <= num_samples:
-            selected = videos
-        else:
-            # 等间距选取，确保覆盖全部时期
-            step = total / num_samples
-            indices = [int(i * step) for i in range(num_samples)]
-            selected = [videos[i] for i in indices]
-
-        parts = []
-        for v in selected:
-            text = v.optimized_full_text
-            snippet = _extract_head_mid_tail(text, head=300, mid=400, tail=300)
-            parts.append(f"【{v.video_title}】\n{snippet}")
-
-        return "\n\n".join(parts)
-
-    # ── 自评估 ──────────────────────
-
-    def _evaluate_and_improve(
-        self, soul_name: str, system_prompt: str, analysis: Dict[str, Any]
-    ) -> Optional[Dict[str, Any]]:
-        """评估生成的 system_prompt 质量"""
-        try:
-            prompt = self.EVALUATION_PROMPT.format(
-                soul_name=soul_name,
-                system_prompt=system_prompt,
-                analysis_json=json.dumps(analysis, ensure_ascii=False, indent=2)
-            )
-
-            result_text = self._call_model(prompt)
-            evaluation = json.loads(result_text)
-
-            overall = evaluation.get("overall_score", 0)
-            logger.info(f"Evaluation for {soul_name}: overall_score={overall}")
-
-            if overall < 3:
-                logger.warning(
-                    f"Low quality score ({overall}/5) for {soul_name}. "
-                    f"Issues: {evaluation.get('summary', 'N/A')}"
-                )
-
-            return evaluation
-
-        except Exception as e:
-            logger.error(f"Error evaluating prompt for {soul_name}: {e}")
-            return None
-
-    # ── common_phrases 扁平化 ──────────────────────
-
-    @staticmethod
-    def _flatten_common_phrases(raw_phrases: Any) -> List[str]:
-        """
-        将 dict 格式的 common_phrases 展平为 List[str]，
-        确保 Soul 端的 PersonaMetadata(common_phrases: List[str]) 不报错。
-        """
-        if isinstance(raw_phrases, list):
-            # 已经是 list，直接过滤确保元素为 str
-            return [str(p) for p in raw_phrases if p]
-
-        if isinstance(raw_phrases, dict):
-            flat = []
-            for values in raw_phrases.values():
-                if isinstance(values, list):
-                    flat.extend(str(v) for v in values if v)
-                elif values:
-                    flat.append(str(values))
-            return flat
-
-        return []
-
-    # ── 降级 prompt ──────────────────────
-
     def _generate_fallback_prompt(self, soul_name: str, analysis: Dict[str, Any]) -> str:
         """生成降级版本的系统 prompt"""
+        # 处理 common_phrases 兼容新旧格式
         raw_phrases = analysis.get("common_phrases", [])
         if isinstance(raw_phrases, dict):
             all_phrases = []
@@ -605,34 +309,60 @@ class PromptGenerator:
 5. 论证时采用你的方式：{analysis.get("argumentation_style", "引用数据和案例")}
 """
 
-    # ── 工具方法 ──────────────────────
+    def create_soul_persona(self, videos: List[OptimizedVideo]) -> Optional[SoulPersona]:
+        """
+        创建完整的人格画像
 
-    def _call_model(self, prompt: str) -> str:
-        """调用模型并清理返回的 markdown 代码块"""
-        response = self.model.generate_content(prompt)
-        result_text = response.text.strip()
+        Args:
+            videos: 的视频列表
 
-        # 清理可能的 markdown 代码块
-        if result_text.startswith("```"):
-            lines = result_text.split("\n")
-            result_text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+        Returns:
+            SoulPersona 对象
+        """
+        if not videos:
+            return None
 
-        return result_text
+        soul_name = videos[0].soul_name
 
+        # 分析
+        analysis = self.analyze_soul(videos)
+        if not analysis:
+            return None
 
-# ── 模块级工具函数 ──────────────────────
+        # 生成系统 prompt
+        system_prompt = self.generate_persona_prompt(soul_name, analysis, videos)
 
-def _extract_head_mid_tail(text: str, head: int = 300, mid: int = 400, tail: int = 300) -> str:
-    """截取文本的 开头 + 中间 + 结尾，确保开场白和结束语都能被捕获。"""
-    total_len = len(text)
-    target = head + mid + tail
+        # 创建人格画像
+        persona = SoulPersona(
+            soul_name=soul_name,
+            speaking_style=analysis.get("speaking_style", ""),
+            common_phrases=analysis.get("common_phrases", []),
+            topic_expertise=analysis.get("topic_expertise", []),
+            personality_traits=analysis.get("personality_traits", []),
+            tone=analysis.get("tone", ""),
+            target_audience=analysis.get("target_audience", ""),
+            content_patterns=analysis.get("content_patterns", ""),
+            argumentation_style=analysis.get("argumentation_style", ""),
+            emotional_range=analysis.get("emotional_range", ""),
+            interaction_style=analysis.get("interaction_style", ""),
+            anti_patterns=analysis.get("anti_patterns", []),
+            system_prompt=system_prompt
+        )
 
-    if total_len <= target:
-        return text
+        return persona
 
-    head_part = text[:head]
-    mid_start = (total_len - mid) // 2
-    mid_part = text[mid_start:mid_start + mid]
-    tail_part = text[-tail:]
+    def save_persona(self, persona: SoulPersona, output_dir: Path):
+        """保存人格画像"""
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-    return f"{head_part}\n...\n{mid_part}\n...\n{tail_part}"
+        # 保存完整的人格画像（JSON）
+        persona_path = output_dir / "persona.json"
+        with open(persona_path, "w", encoding="utf-8") as f:
+            json.dump(persona.to_dict(), f, ensure_ascii=False, indent=2)
+
+        # 单独保存系统 prompt（方便使用）
+        prompt_path = output_dir / "system_prompt.txt"
+        with open(prompt_path, "w", encoding="utf-8") as f:
+            f.write(persona.system_prompt)
+
+        logger.info(f"Saved persona for {persona.soul_name} to {output_dir}")

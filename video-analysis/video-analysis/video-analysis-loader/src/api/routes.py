@@ -142,18 +142,16 @@ async def download_video(request: DownloadRequest):
     """
     同步下载视频
 
-    支持单个视频URL和用户主页URL（抖音）。
+    支持单个视频URL和用户主页URL。
     用户主页URL会自动提取所有视频并批量下载，返回 BatchDownloadResponse。
     """
-    from src.downloaders.douyin import DouyinDownloader
-
     service = get_service()
 
     try:
         output_dir = _resolve_output_dir(request)
 
-        # 检测是否为抖音用户主页URL
-        if DouyinDownloader.is_user_profile_url(request.url):
+        # 通用检测：是否为用户主页URL（支持所有实现了 IUserProfileDownloader 的平台）
+        if service.is_user_profile_url(request.url):
             import time
             start_time = time.time()
 
@@ -239,16 +237,16 @@ async def download_video(request: DownloadRequest):
 )
 async def download_user_stream(request: DownloadRequest):
     """
-    流式下载抖音用户主页所有视频，返回 SSE 事件流。
+    流式下载用户主页所有视频，返回 SSE 事件流。
     每下载完一个视频就推送一个事件，前端可实时显示进度。
+    支持所有实现了 IUserProfileDownloader 的平台。
     """
     import json
-    from src.downloaders.douyin import DouyinDownloader
-
-    if not DouyinDownloader.is_user_profile_url(request.url):
-        raise HTTPException(status_code=400, detail="此接口仅支持用户主页URL")
 
     service = get_service()
+
+    if not service.is_user_profile_url(request.url):
+        raise HTTPException(status_code=400, detail="此接口仅支持用户主页URL")
     output_dir = _resolve_output_dir(request)
 
     async def event_generator():
