@@ -4,7 +4,7 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Optional, Callable, AsyncGenerator, Protocol, runtime_checkable
 
 from .models import VideoInfo, DownloadResult, DownloadProgress, Platform
 
@@ -137,3 +137,29 @@ class IDownloadService(ABC):
     ) -> list[DownloadResult]:
         """批量下载"""
         pass
+
+
+@runtime_checkable
+class IUserProfileDownloader(Protocol):
+    """可选协议：支持用户主页批量下载的下载器实现此接口
+
+    下载器只需实现这两个方法即可自动被 DownloadService 识别和调用，
+    无需修改 IDownloader 或任何上层代码。
+    """
+
+    def is_user_profile_url(self, url: str) -> bool:
+        """判断 URL 是否为用户主页"""
+        ...
+
+    async def download_user_videos_stream(
+        self,
+        user_url: str,
+        output_dir: Path,
+        quality: str = "best",
+        max_retries: int = 3,
+    ) -> AsyncGenerator[dict, None]:
+        """流式下载用户主页视频，yield 标准 SSE 事件 dict
+
+        事件格式参见 src.core.events 中的工厂函数。
+        """
+        ...

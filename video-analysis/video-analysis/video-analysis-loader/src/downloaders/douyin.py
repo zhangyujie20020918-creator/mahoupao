@@ -12,7 +12,7 @@ import json
 import os
 import random
 from pathlib import Path
-from typing import Optional
+from typing import AsyncGenerator, Optional
 from datetime import datetime
 
 import httpx
@@ -38,6 +38,14 @@ class DouyinDownloader(IDownloader):
     SCROLL_RETRY_DELAY = (5.0, 8.0)  # 无新内容时的重试等待（秒），页面加载慢时需要更久
     PAGE_LOAD_DELAY = (1.5, 2.5)    # 页面加载后等待（秒）
     VIDEO_INTERVAL = (0.8, 1.8)     # 视频之间间隔（秒）
+    DOWNLOAD_INTERVAL = (0.3, 1.0)     # 下载间隔（秒）
+
+    USER_AGENTS = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    ]
 
     @staticmethod
     def _random_delay(delay_range: tuple) -> int:
@@ -712,6 +720,808 @@ class DouyinDownloader(IDownloader):
                                 status="downloading",
                             )
                             progress_callback.on_progress(progress)
+
+    @staticmethod
+    def _format_size(size: int) -> str:
+        """格式化文件大小"""
+        if size < 1024:
+            return f"{size} B"
+        elif size < 1024 * 1024:
+            return f"{size / 1024:.1f} KB"
+        elif size < 1024 * 1024 * 1024:
+            return f"{size / (1024 * 1024):.1f} MB"
+        else:
+            return f"{size / (1024 * 1024 * 1024):.2f} GB"
+
+    @classmethod
+    def _get_random_ua(cls) -> str:
+        return random.choice(cls.USER_AGENTS)
+
+    async def _download_file_http(self, download_url: str, file_path: Path) -> tuple[bool, int, str]:
+        """用 HTTP 下载视频文件，返回 (success, file_size, error_message)"""
+        headers = {
+            "User-Agent": self._get_random_ua(),
+            "Referer": "https://www.douyin.com/",
+            "Accept": "video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        }
+        try:
+            async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=180) as client:
+                async with client.stream("GET", download_url) as response:
+                    response.raise_for_status()
+                    total_size = int(response.headers.get("content-length", 0))
+                    downloaded = 0
+                    with open(file_path, "wb") as f:
+                        async for chunk in response.aiter_bytes(chunk_size=65536):
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            if total_size > 0:
+                                pct = downloaded / total_size * 100
+                                print(f"\r[下载进度] {pct:.1f}% ({self._format_size(downloaded)}/{self._format_size(total_size)})", end="", flush=True)
+                    print()
+                    return True, file_path.stat().st_size, ""
+        except Exception as e:
+            return False, 0, str(e)
+
+    async def _download_subtitle_from_aweme(self, aweme_detail: dict, srt_path: Path) -> bool:
+        """从 aweme_detail 中提取字幕并保存为 SRT 文件"""
+        subtitle_url = None
+        for field in ["video_subtitle", "caption_infos"]:
+            items = aweme_detail.get(field)
+            if not items or not isinstance(items, list):
+                continue
+            for item in items:
+                url = item.get("Url") or item.get("url") or item.get("subtitle_url")
+                if url:
+                    subtitle_url = url
+                    break
+            if subtitle_url:
+                break
+
+        if not subtitle_url:
+            return False
+
+        try:
+            headers = {
+                "User-Agent": self._get_random_ua(),
+                "Referer": "https://www.douyin.com/",
+            }
+            async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=30) as client:
+                resp = await client.get(subtitle_url)
+                resp.raise_for_status()
+                content = resp.text
+                if content.strip():
+                    with open(srt_path, "w", encoding="utf-8") as f:
+                        f.write(content)
+                    return True
+        except Exception as e:
+            print(f"[字幕] 下载失败: {e}")
+        return False
+
+    async def _extract_username_from_page(self, page) -> str:
+        """从抖音用户主页提取用户名"""
+        try:
+            title = await page.title()
+            if title and "抖音" in title:
+                name = title.replace("的主页 - 抖音", "").replace("的抖音", "").strip()
+                if name:
+                    return name
+            name_el = await page.query_selector('h1[class*="name"], span[class*="nickname"], [data-e2e="user-info-nickname"]')
+            if name_el:
+                name = await name_el.text_content()
+                if name:
+                    return name.strip()
+        except Exception:
+            pass
+        return ""
+
+    @staticmethod
+    def _get_existing_videos(folder: Path) -> set[str]:
+        """获取文件夹中已下载的视频URL（通过读取元数据）"""
+        existing = set()
+        metadata_file = folder / "_metadata.json"
+        if metadata_file.exists():
+            try:
+                with open(metadata_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    for video in data.get("downloaded_videos", []):
+                        if video.get("url"):
+                            existing.add(video["url"])
+            except Exception:
+                pass
+        return existing
+
+    @staticmethod
+    def _save_user_metadata(folder: Path, user_url: str, user_info: dict, videos: list[dict]):
+        """保存用户下载元数据到文件夹"""
+        metadata = {
+            "user_url": user_url,
+            "username": user_info.get("username", ""),
+            "work_count": user_info.get("work_count", 0),
+            "video_count": user_info.get("video_count", 0),
+            "non_video_count": user_info.get("non_video_count", 0),
+            "last_updated": datetime.now().isoformat(),
+            "downloaded_videos": videos,
+        }
+        metadata_file = folder / "_metadata.json"
+        with open(metadata_file, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, ensure_ascii=False, indent=2)
+
+        urls_file = folder / "_video_urls.txt"
+        with open(urls_file, "w", encoding="utf-8") as f:
+            f.write(f"# 用户: {user_info.get('username', '未知')}\n")
+            f.write(f"# 主页: {user_url}\n")
+            f.write(f"# 作品数: {user_info.get('work_count', 0)} | 视频数: {user_info.get('video_count', 0)}\n")
+            f.write(f"# 更新时间: {datetime.now().isoformat()}\n")
+            f.write(f"# {'='*50}\n\n")
+            for i, video in enumerate(videos, 1):
+                status = "✓" if video.get("success") else "✗"
+                f.write(f"{i:03d}. [{status}] {video.get('url', '')}\n")
+                if video.get("title"):
+                    f.write(f"     标题: {video['title']}\n")
+
+    async def _check_login_status(self, page) -> bool:
+        """检查抖音登录状态"""
+        try:
+            login_btn = await page.query_selector(
+                'button:has-text("登录"), a:has-text("登录"), '
+                'button:has-text("Login"), a:has-text("Login"), '
+                'div[class*="login-btn"], button[class*="login"], '
+                'div[class*="login-guide"]'
+            )
+            if login_btn and await login_btn.is_visible():
+                return False
+            avatar = await page.query_selector(
+                'img[class*="avatar"], div[class*="avatar"], '
+                'img[class*="Avatar"], div[class*="Avatar"]'
+            )
+            if avatar and await avatar.is_visible():
+                return True
+            return True
+        except Exception:
+            return True
+
+    async def download_user_videos_stream(
+        self,
+        user_url: str,
+        output_dir: Path,
+        quality: str = "best",
+        max_retries: int = 3,
+    ) -> AsyncGenerator[dict, None]:
+        """
+        流式下载抖音用户主页视频，逐个 yield 事件。
+
+        特性：
+        - 浏览器保持打开状态，供下次复用
+        - 自动创建以用户名命名的文件夹
+        - 跳过已下载的视频
+        - 保存元数据（视频URL列表、用户信息）
+        - 区分作品数和视频数
+        """
+        from src.core.events import (
+            make_extracting_event, make_extracted_event,
+            make_downloading_event, make_downloaded_event,
+            make_retrying_event, make_done_event, make_error_event,
+        )
+        from src.services.browser_manager import get_browser_manager
+
+        start_time = time.time()
+
+        # 状态变量
+        succeeded_count = 0
+        skipped_count = 0
+        failed_list: list[dict] = []
+        non_video_list: list[dict] = []
+        video_urls: list[str] = []
+        downloaded_urls: set[str] = set()
+        work_count = 0
+        video_count = 0
+        username = ""
+        user_folder: Optional[Path] = None
+        max_retry_rounds = max_retries
+
+        print(f"\n{'='*60}")
+        print(f"[用户主页下载] 开始处理: {user_url}")
+        print(f"{'='*60}\n")
+
+        yield make_extracting_event("正在启动浏览器...")
+
+        self._sync_native_profile()
+        chrome_path = self._get_chrome_path()
+
+        browser_manager = await get_browser_manager()
+        page = await browser_manager.get_page(self.PROFILE_DIR, chrome_path)
+
+        try:
+            # ========== 第一步：访问用户主页 ==========
+            print(f"[步骤1] 正在访问用户主页...")
+            yield make_extracting_event("正在访问用户主页，提取视频列表...")
+
+            await page.goto(user_url, wait_until="domcontentloaded", timeout=60000)
+            await page.wait_for_timeout(self._random_delay(self.PAGE_LOAD_DELAY))
+
+            # 循环检测验证码/登录
+            for auth_attempt in range(10):
+                has_block, block_type = await self._check_captcha(page)
+                if not has_block:
+                    if auth_attempt > 0:
+                        print(f"[信息] ✓ 验证/登录已全部完成")
+                    break
+                print(f"[警告] ⚠️ 检测到 {block_type}！请在浏览器中完成... (第{auth_attempt+1}次)")
+                yield make_extracting_event(f"检测到{block_type}，请在浏览器中完成验证...")
+                resolved = await self._wait_for_auth_resolved(page, 120)
+                if not resolved:
+                    await self._save_debug_info(page, "auth_timeout")
+                    yield make_error_event(f"验证码/登录超时未完成")
+                    return
+                print(f"[信息] ✓ {block_type} 已通过")
+                await page.wait_for_timeout(int(random.uniform(10, 12) * 1000))
+            else:
+                await self._save_debug_info(page, "max_auth_retries")
+                yield make_error_event("验证/登录重试次数过多")
+                return
+
+            # 等待视频链接
+            video_links_found = False
+            for load_attempt in range(5):
+                print(f"[步骤1] 等待页面加载... (第{load_attempt+1}次)")
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=30000)
+                except Exception:
+                    pass
+
+                has_block, block_type = await self._check_captcha(page)
+                if has_block:
+                    print(f"[警告] ⚠️ 检测到 {block_type}！请在浏览器中完成...")
+                    resolved = await self._wait_for_auth_resolved(page, 120)
+                    if not resolved:
+                        yield make_error_event(f"验证码/登录超时未完成")
+                        return
+                    await page.wait_for_timeout(int(random.uniform(10, 12) * 1000))
+                    continue
+
+                try:
+                    await page.wait_for_selector('a[href*="/video/"]', timeout=15000)
+                    print(f"[步骤1] ✓ 视频链接已加载")
+                    is_logged_in = await self._check_login_status(page)
+                    if not is_logged_in:
+                        print(f"[警告] ⚠️ 抖音未登录！未登录状态下可能无法获取全部视频")
+                        yield make_extracting_event("⚠️ 未登录抖音，可能无法获取全部视频。建议登录后重试。")
+                        await page.wait_for_timeout(3000)
+                    video_links_found = True
+                    break
+                except Exception:
+                    await page.wait_for_timeout(5000)
+
+            if not video_links_found:
+                print(f"[警告] 刷新页面重试...")
+                await page.reload(wait_until="networkidle", timeout=60000)
+                await page.wait_for_timeout(8000)
+                try:
+                    await page.wait_for_selector('a[href*="/video/"]', timeout=30000)
+                    video_links_found = True
+                except Exception:
+                    await self._save_debug_info(page, "no_videos_after_refresh")
+                    yield make_error_event("无法加载视频列表，请检查网络或重新登录")
+                    return
+
+            # ========== 提取用户名并创建文件夹 ==========
+            username = await self._extract_username_from_page(page)
+            if username:
+                safe_username = re.sub(r'[\\/*?:"<>|]', "_", username).strip("_")[:50]
+                user_folder = output_dir / safe_username
+            else:
+                user_folder = output_dir / f"douyin_user_{int(time.time())}"
+
+            user_folder.mkdir(parents=True, exist_ok=True)
+            print(f"[用户主页下载] 用户名: {username or '未知'}")
+            print(f"[用户主页下载] 保存目录: {user_folder}")
+
+            downloaded_urls = self._get_existing_videos(user_folder)
+            if downloaded_urls:
+                print(f"[信息] 发现 {len(downloaded_urls)} 个已下载的视频，将跳过")
+
+            await page.wait_for_timeout(self._random_delay(self.PAGE_LOAD_DELAY))
+
+            # ========== 提取作品数和视频链接 ==========
+            extract_js = '''() => {
+                const containers = document.querySelectorAll('div[class*="userNewUi"]');
+                const links = new Set();
+                containers.forEach(container => {
+                    const aTags = container.querySelectorAll('a[href]');
+                    aTags.forEach(a => {
+                        if (a.closest('.user-page-footer')) return;
+                        const href = a.getAttribute('href');
+                        if (href && href.includes('/video/')) links.add(href);
+                    });
+                });
+                return Array.from(links);
+            }'''
+
+            # 获取作品总数
+            try:
+                work_count = await page.evaluate('''() => {
+                    const tabs = document.querySelectorAll('span, div');
+                    for (const el of tabs) {
+                        const text = el.textContent || '';
+                        const match = text.match(/作品[\\s]*([0-9]+)/);
+                        if (match) return parseInt(match[1]);
+                    }
+                    return 0;
+                }''') or 0
+                if work_count:
+                    print(f"[步骤1] 页面显示该用户有 {work_count} 个作品")
+            except Exception:
+                work_count = 0
+
+            # 滚动前：保存页面快照 + 检测可滚动元素
+            await self._save_debug_info(page, "before_scroll")
+            try:
+                scroll_debug = await page.evaluate('''() => {
+                    const results = [];
+                    const candidates = [
+                        document.scrollingElement,
+                        document.documentElement,
+                        document.body,
+                        ...document.querySelectorAll('[class*="user-tab-content"]'),
+                        ...document.querySelectorAll('div[class*="userNewUi"]'),
+                        ...document.querySelectorAll('[class*="container"]'),
+                        ...document.querySelectorAll('main'),
+                    ];
+                    for (const el of candidates) {
+                        if (!el) continue;
+                        const tag = el.tagName || 'unknown';
+                        const cls = (el.className || '').toString().substring(0, 80);
+                        const sh = el.scrollHeight;
+                        const ch = el.clientHeight;
+                        const st = el.scrollTop;
+                        const ov = getComputedStyle(el).overflow + '/' + getComputedStyle(el).overflowY;
+                        if (sh > ch + 10) {
+                            results.push(`SCROLLABLE ${tag} cls="${cls}" scrollH=${sh} clientH=${ch} scrollTop=${st} overflow=${ov}`);
+                        } else {
+                            results.push(`NOT-SCROLLABLE ${tag} cls="${cls}" scrollH=${sh} clientH=${ch} overflow=${ov}`);
+                        }
+                    }
+                    return results;
+                }''')
+                for line in scroll_debug:
+                    print(f"[滚动调试] {line}")
+            except Exception as e:
+                print(f"[滚动调试] 检测失败: {e}")
+
+            # 滚动加载
+            print(f"[步骤1] 正在滚动加载视频列表...")
+            prev_count = 0
+            no_change_rounds = 0
+
+            for i in range(100):
+                try:
+                    hrefs = await page.evaluate(extract_js)
+                except Exception:
+                    await page.wait_for_timeout(self._random_delay((0.8, 1.5)))
+                    continue
+
+                current_count = len(hrefs)
+
+                if work_count and current_count >= work_count:
+                    print(f"[步骤1] ✓ 已加载全部 {current_count}/{work_count} 个作品链接")
+                    break
+
+                if current_count != prev_count:
+                    print(f"[步骤1] 已发现 {current_count}/{work_count or '?'} 个视频链接...")
+                    no_change_rounds = 0
+                else:
+                    no_change_rounds += 1
+                    if no_change_rounds >= 5:
+                        if work_count and current_count < work_count:
+                            print(f"[警告] 滚动后无法加载更多视频（可能需要登录）")
+                        break
+                    print(f"[步骤1] 未发现新内容，等待页面加载 ({no_change_rounds}/5)...")
+                    await page.wait_for_timeout(self._random_delay(self.SCROLL_RETRY_DELAY))
+                    continue
+                prev_count = current_count
+
+                await page.mouse.move(random.randint(900, 1100), random.randint(550, 700))
+                delta_y = random.randint(600, 1800)
+                await page.mouse.wheel(0, delta_y)
+                await page.wait_for_timeout(self._random_delay(self.SCROLL_DELAY))
+
+            # 提取链接
+            hrefs = await page.evaluate(extract_js)
+            for href in hrefs:
+                if href.startswith('/video/'):
+                    video_urls.append(f"https://www.douyin.com{href}")
+                elif 'douyin.com/video/' in href:
+                    video_urls.append(href)
+
+            video_count = len(video_urls)
+            non_video_count = work_count - video_count if work_count > video_count else 0
+
+            print(f"\n[步骤1] 完成！")
+            print(f"  - 作品总数: {work_count}")
+            print(f"  - 视频数量: {video_count}")
+            if non_video_count > 0:
+                print(f"  - 非视频作品: {non_video_count} (图文等)")
+
+            if video_count == 0:
+                await self._save_debug_info(page, "no_videos")
+                yield make_error_event("未找到任何视频，可能需要登录或完成验证")
+                return
+
+            yield make_extracted_event(
+                total=video_count,
+                work_count=work_count,
+                non_video_count=non_video_count,
+                message=f"找到 {video_count} 个视频（作品 {work_count} 个），开始下载...",
+            )
+
+            # ========== 第二步：逐个下载视频 ==========
+            print(f"\n[步骤2] 开始下载视频...")
+            downloaded_videos_info: list[dict] = []
+
+            for idx, video_url in enumerate(video_urls, 1):
+                # 检查是否已下载
+                if video_url in downloaded_urls:
+                    skipped_count += 1
+                    print(f"[视频 {idx}/{video_count}] 已存在，跳过")
+                    downloaded_videos_info.append({"url": video_url, "title": "", "success": True, "skipped": True})
+                    yield make_downloaded_event(
+                        index=idx, total=video_count, title="(已存在)",
+                        success=True, skipped=True,
+                        succeeded_so_far=succeeded_count, skipped_count=skipped_count,
+                    )
+                    continue
+
+                print(f"\n{'─'*50}")
+                print(f"[视频 {idx}/{video_count}] {video_url}")
+
+                yield make_downloading_event(
+                    index=idx, total=video_count, url=video_url,
+                    title=f"视频 {idx}",
+                    succeeded_so_far=succeeded_count,
+                    remaining=video_count - succeeded_count - len(failed_list) - skipped_count,
+                )
+
+                video_data = {}
+                video_captured = asyncio.Event()
+
+                async def handle_response(response):
+                    nonlocal video_data
+                    try:
+                        if "aweme/v1/web/aweme/detail" in response.url or "/aweme/detail" in response.url:
+                            if response.status == 200:
+                                data = await response.json()
+                                if data.get("aweme_detail"):
+                                    video_data = data["aweme_detail"]
+                                    video_captured.set()
+                    except Exception:
+                        pass
+
+                page.on("response", handle_response)
+
+                try:
+                    print(f"[视频 {idx}/{video_count}] 正在获取下载地址...")
+                    await page.goto(video_url, wait_until="domcontentloaded", timeout=30000)
+                    await page.wait_for_timeout(self._random_delay((1.0, 2.0)))
+
+                    has_block, block_type = await self._check_captcha(page)
+                    if has_block:
+                        print(f"[视频 {idx}/{video_count}] ⚠️ 检测到 {block_type}！")
+                        resolved = await self._wait_for_auth_resolved(page, 120)
+                        if not resolved:
+                            failed_list.append({"url": video_url, "title": f"视频 {idx}", "error": "验证超时"})
+                            yield make_downloaded_event(
+                                index=idx, total=video_count, title=f"视频 {idx}",
+                                success=False, error="验证码超时", permanently_failed=True,
+                            )
+                            page.remove_listener("response", handle_response)
+                            continue
+                        await page.wait_for_timeout(int(random.uniform(10, 12) * 1000))
+
+                    try:
+                        await asyncio.wait_for(video_captured.wait(), timeout=15)
+                    except asyncio.TimeoutError:
+                        print(f"[视频 {idx}/{video_count}] 获取超时，尝试从页面提取...")
+
+                    page.remove_listener("response", handle_response)
+
+                    if not video_data:
+                        video_data = await self._extract_from_page(page)
+
+                    if not video_data:
+                        print(f"[视频 {idx}/{video_count}] ✗ 无法获取视频信息")
+                        failed_list.append({"url": video_url, "title": f"视频 {idx}", "error": "无法获取视频信息"})
+                        yield make_downloaded_event(
+                            index=idx, total=video_count, title=f"视频 {idx}",
+                            success=False, error="无法获取视频信息", permanently_failed=True,
+                        )
+                        continue
+
+                    title = video_data.get("desc", f"视频 {idx}") or f"视频 {idx}"
+
+                    # 提取下载地址 (复用已有方法)
+                    try:
+                        download_url = self._extract_video_url(video_data)
+                    except DownloaderError:
+                        download_url = None
+
+                    if not download_url:
+                        print(f"[视频 {idx}/{video_count}] ✗ 无法获取下载地址")
+                        failed_list.append({"url": video_url, "title": title, "error": "无法获取下载地址"})
+                        yield make_downloaded_event(
+                            index=idx, total=video_count, title=title,
+                            success=False, error="无法获取下载地址", permanently_failed=True,
+                        )
+                        continue
+
+                    # 从URL提取视频ID，用于文件名去重
+                    video_id_match = re.search(r'/video/(\d+)', video_url)
+                    video_id = video_id_match.group(1)[-8:] if video_id_match else ""
+
+                    safe_title = re.sub(r'[\s\\/*?:"<>|]', "_", title).strip("_")[:80]
+                    if not safe_title.strip():
+                        safe_title = f"douyin_{idx}"
+                    filename = f"{safe_title}_{video_id}.mp4" if video_id else f"{safe_title}.mp4"
+                    file_path = user_folder / filename
+
+                    old_file_path = user_folder / f"{safe_title}.mp4"
+
+                    if file_path.exists() or (old_file_path.exists() and old_file_path != file_path):
+                        existing = file_path if file_path.exists() else old_file_path
+                        print(f"[视频 {idx}/{video_count}] 文件已存在，跳过: {existing.name}")
+                        skipped_count += 1
+                        downloaded_urls.add(video_url)
+                        downloaded_videos_info.append({"url": video_url, "title": title, "success": True, "skipped": True, "file_path": str(existing)})
+                        yield make_downloaded_event(
+                            index=idx, total=video_count, title=title,
+                            success=True, skipped=True, file_path=str(existing),
+                        )
+                        continue
+
+                    print(f"[视频 {idx}/{video_count}] 正在下载: {title[:30]}...")
+                    success, file_size, error_msg = await self._download_file_http(download_url, file_path)
+
+                    if success:
+                        succeeded_count += 1
+                        downloaded_urls.add(video_url)
+                        downloaded_videos_info.append({"url": video_url, "title": title, "success": True, "file_path": str(file_path)})
+                        print(f"[视频 {idx}/{video_count}] ✓ 下载成功: {self._format_size(file_size)}")
+
+                        srt_path = file_path.with_suffix(".srt")
+                        has_subtitle = await self._download_subtitle_from_aweme(video_data, srt_path)
+                        if has_subtitle:
+                            print(f"[视频 {idx}/{video_count}] ✓ 字幕已保存: {srt_path.name}")
+
+                        yield make_downloaded_event(
+                            index=idx, total=video_count, title=title,
+                            success=True, file_path=str(file_path),
+                            file_size_human=self._format_size(file_size),
+                            has_subtitle=has_subtitle,
+                            succeeded_so_far=succeeded_count,
+                            remaining=video_count - succeeded_count - len(failed_list) - skipped_count,
+                        )
+                        await asyncio.sleep(self._random_delay(self.DOWNLOAD_INTERVAL) / 1000)
+                    else:
+                        print(f"[视频 {idx}/{video_count}] ✗ 下载失败: {error_msg}")
+                        failed_list.append({"url": video_url, "title": title, "error": error_msg})
+                        downloaded_videos_info.append({"url": video_url, "title": title, "success": False, "error": error_msg})
+                        yield make_downloaded_event(
+                            index=idx, total=video_count, title=title,
+                            success=False, error=error_msg, permanently_failed=True,
+                        )
+
+                except Exception as e:
+                    print(f"[视频 {idx}/{video_count}] ✗ 异常: {str(e)}")
+                    page.remove_listener("response", handle_response)
+                    failed_list.append({"url": video_url, "title": f"视频 {idx}", "error": str(e)})
+                    yield make_downloaded_event(
+                        index=idx, total=video_count, title=f"视频 {idx}",
+                        success=False, error=str(e), permanently_failed=True,
+                    )
+
+                await page.wait_for_timeout(self._random_delay(self.VIDEO_INTERVAL))
+
+            # ========== 第三步：失败视频重试 ==========
+            retry_round = 0
+            while failed_list and retry_round < max_retry_rounds:
+                retry_round += 1
+                failed_urls = [f["url"] for f in failed_list]
+                retry_count = len(failed_urls)
+
+                print(f"\n{'='*60}")
+                print(f"[重试 第{retry_round}/{max_retry_rounds}轮] 有 {retry_count} 个视频下载失败，准备重试...")
+                print(f"{'='*60}")
+
+                yield make_retrying_event(
+                    round_num=retry_round, max_rounds=max_retry_rounds,
+                    failed_count=retry_count,
+                )
+
+                # 回到用户首页重新获取链接
+                print(f"[重试] 回到用户首页重新获取视频链接...")
+                await page.goto(user_url, wait_until="domcontentloaded", timeout=60000)
+                await page.wait_for_timeout(self._random_delay(self.PAGE_LOAD_DELAY))
+
+                has_block, block_type = await self._check_captcha(page)
+                if has_block:
+                    print(f"[重试] ⚠️ 检测到 {block_type}！请在浏览器中完成...")
+                    resolved = await self._wait_for_auth_resolved(page, 120)
+                    if not resolved:
+                        print(f"[重试] 验证超时，跳过本轮重试")
+                        break
+                    await page.wait_for_timeout(int(random.uniform(5, 8) * 1000))
+
+                try:
+                    await page.wait_for_selector('a[href*="/video/"]', timeout=15000)
+                except Exception:
+                    print(f"[重试] 无法加载视频列表，跳过本轮重试")
+                    break
+
+                # 滚动加载所有视频
+                print(f"[重试] 滚动加载视频列表...")
+                for _ in range(30):
+                    await page.mouse.move(random.randint(900, 1100), random.randint(550, 700))
+                    await page.mouse.wheel(0, random.randint(600, 1800))
+                    await page.wait_for_timeout(self._random_delay(self.SCROLL_DELAY))
+                    hrefs = await page.evaluate(extract_js)
+                    if work_count and len(hrefs) >= work_count:
+                        break
+
+                old_failed_list = failed_list.copy()
+                failed_list.clear()
+
+                for idx, failed_item in enumerate(old_failed_list, 1):
+                    video_url = failed_item["url"]
+
+                    print(f"\n{'─'*50}")
+                    print(f"[重试 {idx}/{retry_count}] {video_url}")
+
+                    yield make_downloading_event(
+                        index=idx, total=retry_count, url=video_url,
+                        title=failed_item.get("title", f"视频 {idx}"),
+                        is_retry=True, retry_round=retry_round,
+                    )
+
+                    video_data = {}
+                    video_captured = asyncio.Event()
+
+                    async def handle_response_retry(response):
+                        nonlocal video_data
+                        try:
+                            if "aweme/v1/web/aweme/detail" in response.url or "/aweme/detail" in response.url:
+                                if response.status == 200:
+                                    data = await response.json()
+                                    if data.get("aweme_detail"):
+                                        video_data = data["aweme_detail"]
+                                        video_captured.set()
+                        except Exception:
+                            pass
+
+                    page.on("response", handle_response_retry)
+
+                    try:
+                        await page.goto(video_url, wait_until="domcontentloaded", timeout=30000)
+                        await page.wait_for_timeout(self._random_delay((1.5, 2.5)))
+
+                        has_block, block_type = await self._check_captcha(page)
+                        if has_block:
+                            print(f"[重试 {idx}/{retry_count}] ⚠️ 检测到 {block_type}！")
+                            resolved = await self._wait_for_auth_resolved(page, 120)
+                            if not resolved:
+                                failed_list.append(failed_item)
+                                page.remove_listener("response", handle_response_retry)
+                                continue
+                            await page.wait_for_timeout(int(random.uniform(5, 8) * 1000))
+
+                        try:
+                            await asyncio.wait_for(video_captured.wait(), timeout=15)
+                        except asyncio.TimeoutError:
+                            pass
+
+                        page.remove_listener("response", handle_response_retry)
+
+                        if not video_data:
+                            video_data = await self._extract_from_page(page)
+
+                        if not video_data:
+                            print(f"[重试 {idx}/{retry_count}] ✗ 仍无法获取视频信息")
+                            failed_list.append(failed_item)
+                            continue
+
+                        title = video_data.get("desc", failed_item.get("title", f"视频 {idx}")) or f"视频 {idx}"
+
+                        try:
+                            download_url = self._extract_video_url(video_data)
+                        except DownloaderError:
+                            download_url = None
+
+                        if not download_url:
+                            print(f"[重试 {idx}/{retry_count}] ✗ 仍无法获取下载地址")
+                            failed_list.append({"url": video_url, "title": title, "error": "无法获取下载地址"})
+                            continue
+
+                        safe_title = re.sub(r'[\s\\/*?:"<>|]', "_", title).strip("_")[:80]
+                        if not safe_title.strip():
+                            safe_title = f"douyin_retry_{idx}"
+                        file_path = user_folder / f"{safe_title}.mp4"
+
+                        print(f"[重试 {idx}/{retry_count}] 正在下载: {title[:30]}...")
+                        success, file_size, error_msg = await self._download_file_http(download_url, file_path)
+
+                        if success:
+                            succeeded_count += 1
+                            downloaded_urls.add(video_url)
+                            for v in downloaded_videos_info:
+                                if v.get("url") == video_url:
+                                    v["success"] = True
+                                    v["file_path"] = str(file_path)
+                                    v.pop("error", None)
+                                    break
+                            else:
+                                downloaded_videos_info.append({"url": video_url, "title": title, "success": True, "file_path": str(file_path)})
+
+                            print(f"[重试 {idx}/{retry_count}] ✓ 重试成功: {self._format_size(file_size)}")
+                            yield make_downloaded_event(
+                                index=idx, total=retry_count, title=title,
+                                success=True, file_path=str(file_path),
+                                file_size_human=self._format_size(file_size),
+                                is_retry=True, retry_round=retry_round,
+                            )
+                        else:
+                            print(f"[重试 {idx}/{retry_count}] ✗ 重试仍失败: {error_msg}")
+                            failed_list.append({"url": video_url, "title": title, "error": error_msg})
+
+                    except Exception as e:
+                        print(f"[重试 {idx}/{retry_count}] ✗ 异常: {str(e)}")
+                        page.remove_listener("response", handle_response_retry)
+                        failed_list.append({"url": video_url, "title": failed_item.get("title", f"视频 {idx}"), "error": str(e)})
+
+                    await page.wait_for_timeout(self._random_delay(self.VIDEO_INTERVAL))
+
+                print(f"\n[重试 第{retry_round}轮完成] 本轮成功: {retry_count - len(failed_list)} | 仍失败: {len(failed_list)}")
+
+                if not failed_list:
+                    print(f"[重试] ✓ 所有视频已成功下载!")
+                    break
+
+            # ========== 保存元数据 ==========
+            user_info = {
+                "username": username,
+                "work_count": work_count,
+                "video_count": video_count,
+                "non_video_count": non_video_count,
+            }
+            self._save_user_metadata(user_folder, user_url, user_info, downloaded_videos_info)
+            print(f"\n[信息] 已保存元数据到: {user_folder}")
+
+            browser_manager.keep_alive()
+
+        except Exception as e:
+            print(f"\n[错误] {str(e)}")
+            yield make_error_event(str(e))
+            return
+
+        # ========== 完成 ==========
+        elapsed = round(time.time() - start_time, 1)
+        print(f"\n{'='*60}")
+        print(f"[完成] 作品: {work_count} | 视频: {video_count} | 非视频: {non_video_count}")
+        print(f"[完成] 新下载: {succeeded_count} | 已存在跳过: {skipped_count} | 失败: {len(failed_list)}")
+        print(f"[完成] 耗时: {elapsed}s")
+        print(f"[完成] 保存目录: {user_folder}")
+        print(f"{'='*60}\n")
+
+        yield make_done_event(
+            total=video_count,
+            work_count=work_count,
+            non_video_count=non_video_count,
+            succeeded=succeeded_count,
+            skipped=skipped_count,
+            failed=len(failed_list),
+            skipped_videos=failed_list,
+            elapsed_time=elapsed,
+            folder_path=str(user_folder),
+            username=username,
+        )
 
     async def extract_user_video_urls(self, user_url: str, max_scroll: int = 50, interactive: bool = True) -> list[str]:
         """

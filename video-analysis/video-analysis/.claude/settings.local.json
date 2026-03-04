@@ -5,13 +5,15 @@
       "Edit",
       "Write",
       "Read",
-      "Glob",   "Grep",
+      "Glob",
+      "Grep",
       "WebSearch",
       "WebFetch(domain:*)",
       "Task",
       "TodoWrite",
       "NotebookEdit",
-      "mcp__*"
+      "mcp__*",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": [
       "Bash(git push:*)",
