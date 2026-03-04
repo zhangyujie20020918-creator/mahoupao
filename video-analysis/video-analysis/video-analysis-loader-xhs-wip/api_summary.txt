@@ -1,0 +1,16 @@
+共捕获 40 条笔记
+
+--- 所有字段名（第1条）---
+['note_id', 'xsec_token', 'type', 'display_title', 'user', 'interact_info', 'cover']
+
+--- 前10条关键字段 ---
+[ 1] id=6990809b000000002800ba82 type=video xsec_token='ABO9fO6T0-WL48-JgHCQwnfFy7Y8nz...'
+[ 2] id=69905811000000000e03f097 type=video xsec_token='ABO9fO6T0-WL48-JgHCQwnfAI817fX...'
+[ 3] id=699006b8000000000d00b159 type=video xsec_token='ABO9fO6T0-WL48-JgHCQwnfDSLkeDc...'
+[ 4] id=698ef0c5000000001a02d6a4 type=video xsec_token='ABvMU4kHefizxUg78pdEuoAIzGaJnl...'
+[ 5] id=698ecb230000000028020fdb type=video xsec_token='ABvMU4kHefizxUg78pdEuoACu3hpAj...'
+[ 6] id=698c2da2000000001a022fde type=normal xsec_token='ABwlJ1WGhCtMwM808TiTJdloI49DKa...'
+[ 7] id=698bfbd8000000001a02abe8 type=normal xsec_token='ABZqQo9hWtb0JxAauUP0iH4ENd89Jc...'
+[ 8] id=698abb72000000001a036d81 type=normal xsec_token='AB4PvelhjM5KxHua-edhZ02c75PTrO...'
+[ 9] id=69814769000000001a025b19 type=video xsec_token='AB7Rdk_P_PQBVzE8bBdpIVUyXtE8Tg...'
+[10] id=69806f95000000001a0202e4 type=video xsec_token='ABDWWloVy8GQLIxve562Hf01-r-yA6...'

@@ -9,7 +9,19 @@
       "Bash(start http://127.0.0.1:8000)",
       "Bash(npm run dev:*)",
       "Bash(tasklist:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(find \"D:/马后炮\" -name \"*.py\" 2>/dev/null | head -30)",
+      "Bash(cd \"D:/马后炮\" && git check-ignore -v clawd/.env)",
+      "Bash(pip show:*)",
+      "Bash(cp:*)",
+      "Bash(ls:*)",
+      "Bash(netstat:*)",
+      "Bash(cmd:*)",
+      "Bash(xargs -I{} cmd //c \"taskkill /PID {} /F\")",
+      "WebFetch(domain:github.com)",
+      "WebSearch",
+      "Bash(do echo:*)",
+      "Bash(powershell:*)"
     ]
   }
 }
