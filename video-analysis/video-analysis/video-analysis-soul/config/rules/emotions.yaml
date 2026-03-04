@@ -1,0 +1,17 @@
+# 情绪触发词规则
+
+positive:
+  keywords: ["开心", "高兴", "兴奋", "激动", "太好了", "棒", "赞", "感谢", "谢谢"]
+  response_style: warm
+
+negative:
+  keywords: ["难过", "伤心", "失落", "沮丧", "不好", "糟糕", "失望", "后悔"]
+  response_style: empathetic
+
+anxious:
+  keywords: ["焦虑", "担心", "紧张", "害怕", "不安", "忐忑", "纠结"]
+  response_style: reassuring
+
+angry:
+  keywords: ["生气", "愤怒", "烦躁", "不满", "气死", "烦", "恼火"]
+  response_style: calming

@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Edit",
+      "Write",
+      "Read",
+      "Glob",
+      "Grep",
+      "WebSearch",
+      "WebFetch(domain:*)",
+      "Task",
+      "TodoWrite",
+      "NotebookEdit",
+      "mcp__*",
+      "mcp__ide__getDiagnostics"
+    ],
+    "deny": [
+      "Bash(git push:*)",
+      "Bash(gh pr merge:*)"
+    ]
+  }
+}

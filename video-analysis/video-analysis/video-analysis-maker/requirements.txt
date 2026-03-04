@@ -1,0 +1,15 @@
+# Google Gemini API
+google-generativeai>=0.5.0
+
+# Vector Database
+chromadb>=0.4.22
+
+# Embedding Model (BGE)
+sentence-transformers>=2.2.2
+torch>=2.0.0
+
+# Utilities
+python-dotenv>=1.0.0
+tqdm>=4.66.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0

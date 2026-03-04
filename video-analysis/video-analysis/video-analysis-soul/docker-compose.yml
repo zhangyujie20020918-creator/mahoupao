@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  soul:
+    build: .
+    ports:
+      - "8004:8004"
+    volumes:
+      - ./soul_data:/app/soul_data
+      - ./logs:/app/logs
+      - ../video-analysis-maker/output:/app/maker_output:ro
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - MAKER_OUTPUT_PATH=/app/maker_output
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 2G

@@ -1,0 +1,1768 @@
+# 开发进度 - 2026-02-25
+
+## Video-Analysis-Soul 设计文档
+
+### 1. 项目概述
+
+基于 video-analysis-maker 萃取的人格（system_prompt）和向量数据库（ChromaDB），构建支持多用户、长期记忆的智能对话系统。
+
+**核心特性**：
+- 多 Persona 支持：动态加载任意已训练的人格（网红、明星、专家、虚拟角色等）
+- 多用户隔离：每个用户独立的对话历史和记忆
+- 长期记忆：通过 Preview 机制实现跨天记忆
+- 智能检索：LangGraph 驱动的上下文决策
+- 动态缓存：基于活跃度的会话缓存管理
+- 领域无关：通用的情绪检测和信息提取
+
+---
+
+### 2. 系统架构
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         soul.html (前端)                             │
+├─────────────────────────────────────────────────────────────────────┤
+│  [选择]  [用户选择]  [模型选择]  [+ 新用户]                        │
+│  ┌─────────────────────────────────────────────────────────────────┐│
+│  │                        聊天界面                                  ││
+│  │  - 流式响应                                                      ││
+│  │  - 引用来源显示（视频片段）                                        ││
+│  │  - 历史记录加载                                                   ││
+│  └─────────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                   video-analysis-soul (端口 8004)                    │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │                    LangGraph 工作流                            │  │
+│  │                                                               │  │
+│  │   ┌─────────┐    ┌──────────────┐    ┌─────────────────┐      │  │
+│  │   │  START  │───▶│ 意图分析节点  │───▶│ 上下文决策节点   │      │  │
+│  │   └─────────┘    └──────────────┘    └────────┬────────┘      │  │
+│  │                                               │               │  │
+│  │                    ┌──────────────────────────┼───────┐       │  │
+│  │                    ▼                          ▼       ▼       │  │
+│  │            ┌──────────────┐          ┌────────────┐ ┌─────┐   │  │
+│  │            │ Preview 检索  │          │ 知识检索│ │无检索│   │  │
+│  │            │ (历史记忆)    │          │ (ChromaDB) │ │     │   │  │
+│  │            └──────┬───────┘          └─────┬──────┘ └──┬──┘   │  │
+│  │                   │                        │           │      │  │
+│  │                   ▼                        ▼           │      │  │
+│  │            ┌──────────────┐                │           │      │  │
+│  │            │ 详细历史加载  │◀───────────────┘           │      │  │
+│  │            │ (按需)       │                            │      │  │
+│  │            └──────┬───────┘                            │      │  │
+│  │                   │                                    │      │  │
+│  │                   ▼                                    ▼      │  │
+│  │            ┌─────────────────────────────────────────────┐    │  │
+│  │            │              生成回复节点                    │    │  │
+│  │            │  - 组装 system_prompt + 上下文              │    │  │
+│  │            │  - 调用 LLM (Gemini)                       │    │  │
+│  │            │  - 流式输出                                 │    │  │
+│  │            └─────────────────────────────────────────────┘    │  │
+│  │                              │                                │  │
+│  │                              ▼                                │  │
+│  │                       ┌────────────┐                          │  │
+│  │                       │  保存消息   │                          │  │
+│  │                       │  END       │                          │  │
+│  │                       └────────────┘                          │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────┐  │
+│  │   用户管理器     │  │   记忆管理器     │  │   Persona 管理器    │  │
+│  │                 │  │                 │  │                     │  │
+│  │ • 用户 CRUD     │  │ • 每日对话存储   │  │ • 加载 system_prompt│  │
+│  │ • 会话管理      │  │ • Preview 总结   │  │ • 加载 ChromaDB     │  │
+│  │                 │  │ • 历史检索      │  │ • 向量检索          │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────────┘  │
+│                                                                     │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │                    Session Cache Manager                      │  │
+│  │  • 动态会话缓存管理 (基于活跃度)                                │  │
+│  │  • 可配置 idle_timeout (默认 600s)                             │  │
+│  │  • 内存限制和 LRU 淘汰                                         │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 3. Persona 系统设计
+
+#### 3.1 Persona 类型
+
+```python
+class PersonaType(Enum):
+    INFLUENCER = "influencer"   # 网红/
+    CELEBRITY = "celebrity"     # 明星
+    EXPERT = "expert"          # 专家
+    CHARACTER = "character"    # 虚拟角色
+    HISTORICAL = "historical"  # 历史人物
+    CUSTOM = "custom"          # 自定义
+```
+
+#### 3.2 从 video-analysis-maker 初始化
+
+**Maker 输出结构**：
+```
+video-analysis-maker/output/{persona_name}/
+├── persona.json          # 人设元数据
+├── system_prompt.txt     # 系统提示词
+├── chroma_db/           # 向量数据库
+└── optimized_texts/     # 处理后的文本
+```
+
+**persona.json 字段映射**：
+| Maker 字段 | Soul 字段 | 说明 |
+|-----------|----------|------|
+| soul_name | persona_name | 人格名称 |
+| speaking_style | speaking_style | 说话风格 |
+| common_phrases | common_phrases | 常用语句 |
+| topic_expertise | topic_expertise | 专业领域 |
+| personality_traits | personality_traits | 人格特征 |
+| tone | tone | 语气 |
+| target_audience | target_audience | 目标受众 |
+| content_patterns | content_patterns | 内容模式 |
+| system_prompt | system_prompt | 系统提示词 |
+
+#### 3.3 PersonaManager 核心逻辑
+
+```python
+class PersonaManager:
+    """从 video-analysis-maker 输出加载 Persona"""
+
+    def __init__(self):
+        self.maker_output_dir = Path(settings.maker_output_path)
+        self._persona_cache: Dict[str, PersonaMetadata] = {}
+        self._chroma_clients: Dict[str, chromadb.PersistentClient] = {}
+
+    def load_persona(self, persona_name: str) -> PersonaMetadata:
+        """加载 Persona 元数据"""
+        # 1. 读取 persona.json
+        # 2. 读取 system_prompt.txt (优先)
+        # 3. 构建 PersonaMetadata
+        # 4. 缓存并返回
+
+    def get_knowledge_collection(self, persona_name: str) -> chromadb.Collection:
+        """获取 ChromaDB 知识库连接"""
+        # 直接连接 maker 生成的 chroma_db 目录
+
+    def search_knowledge(self, persona_name: str, query: str, n_results: int = 5) -> list:
+        """搜索 Persona 知识库"""
+
+    def list_available_personas(self) -> list:
+        """扫描 maker 输出目录，列出所有可用 Persona"""
+```
+
+#### 3.4 ChromaDB Collection 名称规则
+
+与 maker 保持一致的命名规则：
+```python
+def _get_collection_name(persona_name: str) -> str:
+    """生成 ChromaDB collection 名称"""
+    name_hash = hashlib.md5(persona_name.encode('utf-8')).hexdigest()[:8]
+    sanitized = re.sub(r'[^a-zA-Z0-9._-]', '', persona_name)
+
+    if not sanitized:
+        return f"soul_{name_hash}"
+
+    if not sanitized[0].isalnum():
+        sanitized = f"b{sanitized}"
+    if not sanitized[-1].isalnum():
+        sanitized = f"{sanitized}0"
+
+    return f"{sanitized}_{name_hash}"
+```
+
+---
+
+### 4. 数据存储设计
+
+#### 4.1 目录结构
+
+```
+soul_data/
+├── users/
+│   ├── {user_id}/
+│   │   ├── profile.json              # 用户基本信息
+│   │   ├── preview.json              # 记忆总览（跨天累积）
+│   │   └── conversations/
+│   │       └── {soul_name}/
+│   │           ├── 2026-02-25.json   # 当天对话
+│   │           ├── 2026-02-24.json   # 历史对话
+│   │           └── ...
+│   └── index.json                    # 用户索引
+│
+└── (数据复用 maker 的 output/ 目录)
+```
+
+#### 4.2 数据模型
+
+**profile.json** - 用户档案
+```json
+{
+  "id": "uuid-xxx",
+  "name": "小明",
+  "created_at": "2026-02-25T10:00:00",
+  "last_active": "2026-02-25T15:30:00"
+}
+```
+
+**preview.json** - 记忆总览（核心设计）
+```json
+{
+  "user_id": "uuid-xxx",
+  "last_updated": "2026-02-25T23:59:00",
+  "summary_version": 3,
+  "memories": [
+    {
+      "date": "2026-02-25",
+      "soul": "勇哥说财经",
+      "summary": {
+        "topics_discussed": ["AI应用板块", "商业航天"],
+        "people_mentioned": [
+          {"name": "张三", "relation": "用户的朋友", "context": "一起炒股"}
+        ],
+        "places": ["北京", "上海证券交易所"],
+        "events": [
+          {"what": "用户买入了AI板块股票", "when": "上周", "result": "盈利"}
+        ],
+        "emotions": ["焦虑（担心股票下跌）", "兴奋（听到利好消息）"],
+        "objects": [
+          {"name": "红色笔记本", "context": "记录交易", "owner": "用户"}
+        ],
+        "user_preferences": ["喜欢短线操作", "关注AI方向"],
+        "key_facts": ["持有xx股票", "本金约10万"]
+      }
+    },
+    {
+      "date": "2026-02-24",
+      "soul": "勇哥说财经",
+      "summary": { ... }
+    }
+  ]
+}
+```
+
+**2026-02-25.json** - 每日对话记录
+```json
+{
+  "date": "2026-02-25",
+  "user_id": "uuid-xxx",
+  "soul": "勇哥说财经",
+  "messages": [
+    {
+      "id": "msg-001",
+      "role": "user",
+      "content": "今天AI应用怎么看？",
+      "timestamp": "2026-02-25T10:00:00"
+    },
+    {
+      "id": "msg-002",
+      "role": "assistant",
+      "content": "兄弟们！AI应用这个方向...",
+      "timestamp": "2026-02-25T10:00:05",
+      "sources": [
+        {"video": "xxx", "segment": 3, "relevance": 0.85}
+      ]
+    }
+  ],
+  "message_count": 20
+}
+```
+
+---
+
+### 5. LangGraph 工作流设计
+
+#### 5.1 状态定义
+
+```python
+from typing import TypedDict, List, Optional, Literal
+from langgraph.graph import StateGraph
+
+class SoulState(TypedDict):
+    # 输入
+    user_id: str
+    soul_name: str
+    user_message: str
+    model: str
+
+    # 分析结果
+    intent: Literal["greeting", "question", "recall", "chat", "farewell"]
+    needs_soul_knowledge: bool      # 是否需要知识库
+    needs_memory_recall: bool          # 是否需要回忆历史
+    memory_keywords: List[str]         # 需要检索的记忆关键词
+
+    # 检索结果
+    soul_context: List[str]         # 知识检索结果
+    memory_context: Optional[str]      # 历史记忆检索结果
+    detailed_history: Optional[str]    # 加载的详细历史
+
+    # 当前上下文
+    today_messages: List[dict]         # 今日对话历史
+    preview_summary: dict              # Preview 总览
+    system_prompt: str                 #  system prompt
+
+    # 输出
+    response: str                      # AI 回复
+    sources: List[dict]                # 引用来源
+```
+
+#### 5.2 节点设计
+
+```python
+# 节点 1: 意图分析
+def analyze_intent(state: SoulState) -> SoulState:
+    """
+    分析用户意图，判断需要什么类型的上下文
+
+    使用轻量模型 (gemini-2.0-flash-lite) 快速分析：
+    - greeting: 打招呼 → 不需要检索
+    - question: 专业问题 → 需要知识库
+    - recall: 提及过去 → 需要记忆检索
+    - chat: 日常闲聊 → 可能需要记忆
+    - farewell: 告别 → 不需要检索
+
+    返回: intent, needs_soul_knowledge, needs_memory_recall, memory_keywords
+    """
+    pass
+
+# 节点 2: 上下文决策（条件路由）
+def route_context(state: SoulState) -> str:
+    """
+    根据意图决定走哪个检索分支
+
+    返回: "soul_search" | "memory_search" | "both" | "direct"
+    """
+    if state["needs_soul_knowledge"] and state["needs_memory_recall"]:
+        return "both"
+    elif state["needs_soul_knowledge"]:
+        return "soul_search"
+    elif state["needs_memory_recall"]:
+        return "memory_search"
+    else:
+        return "direct"
+
+# 节点 3a: 知识检索
+def search_soul_knowledge(state: SoulState) -> SoulState:
+    """
+    从 ChromaDB 检索相关视频内容
+
+    - 检索 top 5 相关片段
+    - 带上下文窗口 (前后各 2 段)
+    """
+    pass
+
+# 节点 3b: 记忆检索
+def search_memory(state: SoulState) -> SoulState:
+    """
+    从 Preview 中检索相关记忆
+
+    1. 用 memory_keywords 在 preview.json 中搜索
+    2. 找到相关的 date 和 summary
+    3. 如果需要更多细节，标记 needs_detailed_history
+    """
+    pass
+
+# 节点 4: 详细历史加载（可选）
+def load_detailed_history(state: SoulState) -> SoulState:
+    """
+    按需加载特定日期的详细对话
+
+    只在 memory_context 不够详细时触发
+    """
+    pass
+
+# 节点 5: 生成回复
+def generate_response(state: SoulState) -> SoulState:
+    """
+    组装最终 prompt，调用 LLM 生成回复
+
+    Prompt 结构：
+    [System Prompt - 人格]
+
+    [Preview Summary - 用户记忆总览]
+    关于这位用户，你记得：
+    - 他叫{name}
+    - 上次聊过{topics}
+    - 他提到过{people}
+
+    [Today's Context - 今日对话]
+    今天的对话：
+    用户: xxx
+    你: xxx
+
+    [Retrieved Context - 检索到的相关内容]
+    相关视频内容：
+    {soul_context}
+
+    相关历史记忆：
+    {memory_context}
+
+    [Current Message]
+    用户: {user_message}
+    """
+    pass
+
+# 节点 6: 保存消息
+def save_message(state: SoulState) -> SoulState:
+    """
+    保存用户消息和 AI 回复到今日 JSON
+    """
+    pass
+```
+
+#### 5.3 Graph 构建
+
+```python
+from langgraph.graph import StateGraph, END
+
+# 创建 Graph
+workflow = StateGraph(SoulState)
+
+# 添加节点
+workflow.add_node("analyze_intent", analyze_intent)
+workflow.add_node("search_soul", search_soul_knowledge)
+workflow.add_node("search_memory", search_memory)
+workflow.add_node("load_history", load_detailed_history)
+workflow.add_node("generate", generate_response)
+workflow.add_node("save", save_message)
+
+# 设置入口
+workflow.set_entry_point("analyze_intent")
+
+# 条件路由
+workflow.add_conditional_edges(
+    "analyze_intent",
+    route_context,
+    {
+        "soul_search": "search_soul",
+        "memory_search": "search_memory",
+        "both": "search_soul",  # 先搜，再搜记忆
+        "direct": "generate"
+    }
+)
+
+# 搜索后的路由
+workflow.add_conditional_edges(
+    "search_soul",
+    lambda s: "search_memory" if s["needs_memory_recall"] else "generate",
+    {
+        "search_memory": "search_memory",
+        "generate": "generate"
+    }
+)
+
+# 记忆搜索后的路由
+workflow.add_conditional_edges(
+    "search_memory",
+    lambda s: "load_history" if s.get("needs_detailed_history") else "generate",
+    {
+        "load_history": "load_history",
+        "generate": "generate"
+    }
+)
+
+# 详细历史 → 生成
+workflow.add_edge("load_history", "generate")
+
+# 生成 → 保存 → 结束
+workflow.add_edge("generate", "save")
+workflow.add_edge("save", END)
+
+# 编译
+app = workflow.compile()
+```
+
+---
+
+### 6. Preview 总结机制
+
+#### 6.1 触发时机
+
+- **实时增量**: 每 10 条消息后触发一次轻量总结
+- **每日汇总**: 每天首次对话时，总结前一天内容
+- **手动触发**: API 支持强制刷新
+
+#### 6.2 总结 Prompt
+
+```
+你是一个记忆助手，负责总结用户和的对话。
+
+请从以下对话中提取关键信息，格式如下：
+{
+  "topics_discussed": ["讨论的主题"],
+  "people_mentioned": [
+    {"name": "人名", "relation": "与用户的关系", "context": "提及场景"}
+  ],
+  "places": ["地名"],
+  "events": [
+    {"what": "事件描述", "when": "时间", "result": "结果"}
+  ],
+  "emotions": ["用户表现出的情绪"],
+  "objects": [
+    {"name": "物品名", "context": "使用场景", "owner": "所属人"}
+  ],
+  "user_preferences": ["用户偏好"],
+  "key_facts": ["重要事实"]
+}
+
+注意：
+- 保留细节但不要过于冗长
+- 人名、地名、物品名要准确
+- 情绪要结合上下文描述
+- 如果没有某类信息，返回空数组
+
+今天的对话：
+{conversation}
+```
+
+---
+
+### 7. 动态缓存管理
+
+#### 7.1 SessionCacheManager
+
+```python
+class SessionCacheManager:
+    """动态会话缓存管理器"""
+
+    def __init__(self, config: CacheConfig):
+        self.config = config
+        self._sessions: Dict[str, SessionData] = {}
+        self._lock = asyncio.Lock()
+        self._cleanup_task: Optional[asyncio.Task] = None
+
+    async def start(self):
+        """启动后台清理任务"""
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+
+    async def _cleanup_loop(self):
+        """定期清理过期会话"""
+        while True:
+            await asyncio.sleep(60)  # 每分钟检查
+            await self._cleanup_idle_sessions()
+
+    async def _cleanup_idle_sessions(self):
+        """清理空闲会话"""
+        now = datetime.now()
+        async with self._lock:
+            expired = [
+                sid for sid, session in self._sessions.items()
+                if (now - session.last_active).total_seconds() > self.config.idle_timeout_seconds
+            ]
+            for sid in expired:
+                del self._sessions[sid]
+                logger.info(f"Released idle session: {sid}")
+```
+
+#### 7.2 缓存配置
+
+```yaml
+cache:
+  # 会话空闲超时 (秒)
+  idle_timeout_seconds: 600  # 10分钟
+
+  # 最大并发会话数
+  max_sessions: 50
+
+  # 单个会话最大消息缓存
+  max_messages_per_session: 100
+
+  # 内存使用上限 (MB)
+  max_memory_mb: 512
+
+  # 清理检查间隔 (秒)
+  cleanup_interval_seconds: 60
+```
+
+---
+
+### 8. 性能优化策略
+
+#### 8.1 响应延迟优化
+
+| 环节 | 优化策略 | 预期延迟 |
+|------|---------|---------|
+| 意图分析 | 使用 gemini-2.0-flash-lite | ~200ms |
+| 知识检索 | ChromaDB 本地向量搜索 | ~50ms |
+| 记忆检索 | JSON 文件内存缓存 + 关键词匹配 | ~10ms |
+| 详细历史加载 | 按需加载，LRU 缓存 | ~20ms |
+| 生成回复 | 流式输出，首 token 快 | ~500ms |
+| **总计** | | **~800ms 首响应** |
+
+#### 8.2 缓存策略
+
+```python
+# 1. 数据缓存 (启动时加载)
+soul_cache = {
+    "勇哥说财经": {
+        "system_prompt": "...",
+        "chroma_collection": <ChromaCollection>,
+        "loaded_at": datetime
+    }
+}
+
+# 2. 用户 Preview 缓存 (LRU)
+preview_cache = LRUCache(maxsize=100)  # 最多缓存 100 个用户
+
+# 3. 今日对话缓存 (内存)
+today_conversations = {
+    ("user_id", "soul"): [messages]
+}
+```
+
+#### 8.3 并行处理
+
+```python
+# 知识检索 和 记忆检索 可并行
+async def parallel_search(state):
+    results = await asyncio.gather(
+        search_soul_knowledge(state),
+        search_memory(state)
+    )
+    return merge_results(results)
+```
+
+---
+
+### 9. 用户体验设计
+
+#### 9.1 流式响应
+
+```
+用户发送消息
+     │
+     ▼
+[分析中...] ← 显示思考状态 (200ms)
+     │
+     ▼
+[检索相关内容...] ← 显示检索状态 (50ms)
+     │
+     ▼
+流式输出文字 ← 逐字显示回复
+     │
+     ▼
+[引用来源] ← 显示参考的视频片段
+```
+
+#### 9.2 记忆展示
+
+当 AI 使用了历史记忆时，在回复中标注：
+
+```
+💭 我记得你之前说过...
+
+[正常回复内容]
+
+📎 参考了 2026-02-24 的对话
+```
+
+#### 9.3 错误处理
+
+| 场景 | 处理方式 |
+|------|---------|
+| LLM 超时 | 重试 1 次，仍失败则返回友好提示 |
+| 检索无结果 | 正常生成，不强制使用上下文 |
+| Preview 损坏 | 自动重建，不影响对话 |
+
+---
+
+### 10. API 接口设计
+
+#### 10.1 接口列表
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/soul/status` | 服务状态 |
+| GET | `/api/soul/models` | 可用模型列表 |
+| GET | `/api/soul/souls` | 可用列表 |
+| GET | `/api/soul/users` | 用户列表 |
+| POST | `/api/soul/users` | 创建用户 |
+| DELETE | `/api/soul/users/{id}` | 删除用户 |
+| GET | `/api/soul/history/{user_id}/{soul}` | 获取对话历史 |
+| POST | `/api/soul/chat` | 发送消息（SSE 流式） |
+| POST | `/api/soul/preview/refresh` | 强制刷新 Preview |
+
+#### 10.2 Chat 接口详情
+
+**请求**:
+```json
+POST /api/soul/chat
+{
+  "user_id": "uuid-xxx",
+  "soul": "勇哥说财经",
+  "message": "今天AI应用怎么看？",
+  "model": "gemini-2.5-flash"
+}
+```
+
+**响应** (SSE 流式):
+```
+event: thinking
+data: {"status": "analyzing"}
+
+event: searching
+data: {"status": "searching_knowledge", "query": "AI应用"}
+
+event: token
+data: {"content": "兄"}
+
+event: token
+data: {"content": "弟"}
+
+event: token
+data: {"content": "们"}
+
+...
+
+event: done
+data: {
+  "message_id": "msg-xxx",
+  "sources": [
+    {"video": "xxx", "segment": 3, "text": "..."}
+  ],
+  "memory_used": false
+}
+```
+
+---
+
+### 11. 前端页面设计 (soul.html)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  🧠 灵魂对话                                           [设置]   │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
+│  │ 👤 勇哥说财经 ▼│  │ 🙋 小明     ▼│  │ ⚡ 2.5-flash▼│  [+新用户]  │
+│  └──────────────┘  └──────────────┘  └──────────────┘              │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────────┐│
+│  │                                                                 ││
+│  │  ┌─────────────────────────────────────────┐                   ││
+│  │  │ 🤖 勇哥说财经                            │                   ││
+│  │  │ 兄弟们！欢迎来找勇哥聊天，有什么问题尽管问！│                   ││
+│  │  └─────────────────────────────────────────┘                   ││
+│  │                                                                 ││
+│  │                   ┌─────────────────────────────────────────┐  ││
+│  │                   │ 今天AI应用板块怎么看？                    │  ││
+│  │                   │                                    🙋 小明│  ││
+│  │                   └─────────────────────────────────────────┘  ││
+│  │                                                                 ││
+│  │  ┌─────────────────────────────────────────┐                   ││
+│  │  │ 🤖 勇哥说财经                            │                   ││
+│  │  │                                         │                   ││
+│  │  │ 兄弟们！AI应用这个方向，勇哥跟你们说，    │                   ││
+│  │  │ 这是2026年最确定的主线，没有之一！       │                   ││
+│  │  │                                         │                   ││
+│  │  │ 📎 参考: AI应用强势回归... (点击查看)    │                   ││
+│  │  └─────────────────────────────────────────┘                   ││
+│  │                                                                 ││
+│  └─────────────────────────────────────────────────────────────────┘│
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────┐ [发送]    │
+│  │ 输入消息...                                          │           │
+│  └─────────────────────────────────────────────────────┘           │
+│                                                                     │
+│  📊 Preview: 已记忆 3 天对话 | 💬 今日: 5 条消息                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 12. 项目文件结构
+
+```
+video-analysis-soul/
+├── api/                           # API 层
+│   ├── __init__.py
+│   ├── routes/
+│   │   ├── __init__.py
+│   │   ├── chat.py               # POST /chat (SSE)
+│   │   ├── personas.py           # GET /personas, GET /personas/{id}
+│   │   ├── users.py              # CRUD /users
+│   │   ├── history.py            # GET /history/{user_id}/{persona}
+│   │   └── system.py             # GET /status, GET /models
+│   ├── schemas/
+│   │   ├── __init__.py
+│   │   ├── chat.py               # ChatRequest, ChatEvent
+│   │   ├── persona.py            # PersonaResponse
+│   │   ├── user.py               # UserCreate, UserResponse
+│   │   └── common.py             # BaseResponse, ErrorResponse
+│   └── middleware/
+│       ├── __init__.py
+│       ├── error_handler.py      # 全局异常处理
+│       └── logging.py            # 请求日志
+│
+├── core/                          # 核心层
+│   ├── __init__.py
+│   ├── engine.py                 # SoulEngine 主入口
+│   ├── session.py                # SessionManager
+│   └── graph/
+│       ├── __init__.py
+│       ├── state.py              # SoulState 定义
+│       ├── workflow.py           # LangGraph 构建
+│       ├── nodes/
+│       │   ├── __init__.py
+│       │   ├── load_context.py       # 加载上下文
+│       │   ├── analyze_message.py    # 意图/情绪分析
+│       │   ├── route_decision.py     # 路由决策
+│       │   ├── greeting_flow.py      # 打招呼流程
+│       │   ├── knowledge_retrieval.py # 知识检索
+│       │   ├── memory_retrieval.py   # 记忆检索
+│       │   ├── load_detail_history.py # 加载详细历史
+│       │   ├── generate_response.py  # 生成回复
+│       │   ├── post_process.py       # 后处理
+│       │   └── update_memory.py      # 更新记忆
+│       └── routes.py             # 条件路由函数
+│
+├── services/                      # 服务层
+│   ├── __init__.py
+│   ├── llm_service.py            # LLM 调用封装
+│   ├── retrieval_service.py      # 知识检索服务
+│   ├── analysis_service.py       # 意图/情绪分析
+│   ├── generation_service.py     # 回复生成
+│   └── embedding_service.py      # Embedding 服务
+│
+├── managers/                      # 管理层
+│   ├── __init__.py
+│   ├── persona_manager.py        # Persona 管理 (从 maker 加载)
+│   ├── user_manager.py           # 用户管理
+│   ├── memory_manager.py         # 记忆管理
+│   └── cache_manager.py          # 动态缓存管理
+│
+├── storage/                       # 存储层
+│   ├── __init__.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── persona.py            # PersonaMetadata
+│   │   ├── user.py               # UserProfile
+│   │   ├── memory.py             # Preview, DailyConversation
+│   │   └── message.py            # Message
+│   ├── repositories/
+│   │   ├── __init__.py
+│   │   ├── user_repository.py    # 用户数据读写
+│   │   ├── memory_repository.py  # 记忆数据读写
+│   │   └── conversation_repository.py # 对话数据读写
+│   └── vector_stores/
+│       ├── __init__.py
+│       ├── chroma_store.py       # ChromaDB 封装
+│       └── faiss_store.py        # FAISS 封装 (用户记忆)
+│
+├── common/                        # 公共层
+│   ├── __init__.py
+│   ├── config.py                 # 配置管理
+│   ├── logger.py                 # 日志配置
+│   ├── exceptions.py             # 自定义异常
+│   └── utils/
+│       ├── __init__.py
+│       ├── text.py               # 文本处理
+│       ├── datetime.py           # 时间处理
+│       └── async_utils.py        # 异步工具
+│
+├── config/                        # 配置文件
+│   ├── settings.yaml             # 主配置
+│   ├── prompts/
+│   │   ├── intent_analysis.txt   # 意图分析 Prompt
+│   │   ├── emotion_detection.txt # 情绪检测 Prompt
+│   │   ├── preview_summary.txt   # Preview 总结 Prompt
+│   │   └── info_extraction.txt   # 信息提取 Prompt
+│   └── rules/
+│       ├── patterns.yaml         # 意图模式规则
+│       ├── emotions.yaml         # 情绪触发词
+│       └── extraction.yaml       # 信息提取规则
+│
+├── soul_data/                     # 运行时数据
+│   └── users/
+│       └── {user_id}/
+│           ├── profile.json
+│           ├── preview.json
+│           ├── relationships.json
+│           ├── memory_index/     # FAISS 索引
+│           └── conversations/
+│               └── {persona_name}/
+│                   └── {date}.json
+│
+├── main.py                        # FastAPI 入口
+├── requirements.txt               # 依赖
+├── .env.example                   # 环境变量模板
+└── README.md
+```
+
+---
+
+### 13. 配置系统设计
+
+#### 13.1 环境变量 (.env)
+
+```bash
+# LLM API
+GOOGLE_API_KEY=your_google_api_key
+
+# 服务配置
+SOUL_HOST=0.0.0.0
+SOUL_PORT=8004
+SOUL_DEBUG=false
+
+# 路径配置
+MAKER_OUTPUT_PATH=../video-analysis-maker/output
+SOUL_DATA_PATH=./soul_data
+
+# 日志
+LOG_LEVEL=INFO
+LOG_FILE=logs/soul.log
+```
+
+#### 13.2 主配置 (settings.yaml)
+
+```yaml
+# Persona 配置
+persona:
+  maker_output_path: "${MAKER_OUTPUT_PATH:../video-analysis-maker/output}"
+  default_persona: null
+  knowledge_retrieval:
+    top_k: 10
+    rerank_top_k: 3
+    include_context: true
+    context_window: 2
+
+# 用户记忆配置
+memory:
+  preview:
+    retention: permanent          # 永久保留
+    summary_trigger_messages: 10  # 每10条消息触发总结
+  detailed_history:
+    retention_days: 14            # 保留14天
+    archive_enabled: true         # 超期归档（不删除）
+  long_term:
+    enabled: true
+    retention: permanent          # 永久保留
+    max_facts: 200
+
+# 缓存配置
+cache:
+  idle_timeout_seconds: 600
+  max_sessions: 50
+  max_messages_per_session: 100
+  max_memory_mb: 512
+  cleanup_interval_seconds: 60
+
+# LLM 模型配置
+llm:
+  default_model: "gemini-2.5-flash"
+  analysis_model: "gemini-2.0-flash-lite"
+  summary_model: "gemini-2.0-flash"
+  available_models:
+    - gemini-2.5-flash
+    - gemini-2.5-pro
+    - gemini-2.0-flash
+    - gemini-2.0-flash-lite
+  timeout_seconds: 30
+  max_retries: 2
+
+# 分析配置
+analysis:
+  intent:
+    enabled: true
+    confidence_threshold: 0.7
+  emotion:
+    enabled: true
+    general_triggers:
+      - ["开心", "高兴", "兴奋", "激动"]
+      - ["难过", "伤心", "失落", "沮丧"]
+      - ["焦虑", "担心", "紧张", "害怕"]
+      - ["生气", "愤怒", "烦躁", "不满"]
+    response_style:
+      positive: "warm"
+      negative: "empathetic"
+      anxious: "reassuring"
+  info_extraction:
+    enabled: true
+    extract_types:
+      - "person_name"
+      - "location"
+      - "event"
+      - "preference"
+      - "relationship"
+
+# 流式响应配置
+streaming:
+  chunk_size: 10
+  heartbeat_interval_ms: 15000
+```
+
+---
+
+### 14. 依赖清单
+
+```
+# requirements.txt
+fastapi>=0.109.0
+uvicorn>=0.27.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+
+# LangGraph
+langgraph>=0.0.40
+langchain>=0.1.0
+langchain-google-genai>=0.0.9
+
+# 向量数据库
+chromadb>=0.4.22
+sentence-transformers>=2.2.2
+
+# 工具
+aiofiles>=23.0.0
+cachetools>=5.3.0
+```
+
+---
+
+### 15. 设计决策总览 (全部已确认 ✅)
+
+| 问题 | 决策 | 说明 |
+|------|------|------|
+| Persona 来源 | 从 maker 输出加载 | 直接读取 persona.json 和 ChromaDB |
+| 缓存策略 | 动态管理 | 基于活跃度，可配置 idle_timeout |
+| Persona 类型 | 通用化 | 支持网红、明星、专家、虚拟角色等 |
+| 情绪检测 | 领域无关 | 通用触发词 + 领域增强 |
+| 信息提取 | 领域无关 | 通用类型 + 领域增强 |
+| LLM 模型 | 多层级 | 不同任务用不同模型 |
+| Preview 存储 | JSON + FAISS | 支持语义搜索 |
+| 记忆保留 | 分层永久保留 | 详细14天，Preview永久，长期记忆永久 |
+| 记忆隔离 | 部分共享 | 用户信息共享，对话按Persona隔离 |
+| 打招呼 | 动态+风格模板 | 基于登录时间动态反馈 |
+| 错误恢复 | 降级+日志 | 降级到轻量模型，完善日志系统 |
+| 前端交互 | 类人话术 | 折叠展开，配置项控制调试信息 |
+| 测试策略 | 除前端外全覆盖 | mock + 真实环境两种 |
+| 部署 | Docker + 多实例 | JSON日志格式 |
+
+---
+
+### 16. 记忆保留策略详细设计
+
+#### 16.1 记忆层级
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        记忆金字塔                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│    ┌─────────────────┐                                          │
+│    │   长期记忆       │  ← 永久保留，核心事实                      │
+│    │ (long_term)     │    用户姓名、职业、重要关系、核心偏好        │
+│    └────────┬────────┘                                          │
+│             │                                                   │
+│    ┌────────▼────────┐                                          │
+│    │   Preview 总结   │  ← 永久保留，每日/每周总结                 │
+│    │ (preview)       │    可基于 Preview 进一步抽象概括            │
+│    └────────┬────────┘                                          │
+│             │                                                   │
+│    ┌────────▼────────┐                                          │
+│    │   详细对话       │  ← 保留 14 天，超期归档                    │
+│    │ (conversations) │    完整对话记录，支持回溯                   │
+│    └─────────────────┘                                          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 16.2 数据生命周期
+
+| 数据类型 | 保留期限 | 超期处理 | 存储位置 |
+|----------|----------|----------|----------|
+| 详细对话 | 14 天 | 归档到 archive/ | conversations/{persona}/{date}.json |
+| Preview 总结 | 永久 | 不删除 | preview.json |
+| 长期记忆 | 永久 | 不删除 | long_term_memory.json |
+| 归档对话 | 永久 | 压缩存储 | archive/{persona}/{year-month}.json.gz |
+
+#### 16.3 用户数据结构（更新）
+
+```
+soul_data/users/{user_id}/
+├── profile.json              # 共享：用户基本信息
+├── relationships.json        # 共享：人物关系网络
+├── long_term_memory.json     # 共享：核心事实（永久）
+├── memory_index/             # 共享：FAISS 向量索引
+│   └── user_memory.faiss
+├── conversations/            # 隔离：按 Persona 分开
+│   └── {persona_name}/
+│       ├── preview.json      # 该 Persona 的对话总结（永久）
+│       ├── 2026-02-25.json   # 当天详细对话
+│       ├── 2026-02-24.json   # 昨天详细对话
+│       └── ...               # 最多保留 14 天
+└── archive/                  # 隔离：归档的历史对话
+    └── {persona_name}/
+        ├── 2026-01.json.gz   # 按月压缩归档
+        └── 2025-12.json.gz
+```
+
+#### 16.4 归档任务
+
+```python
+class ArchiveManager:
+    """对话归档管理器"""
+
+    async def archive_expired_conversations(self, user_id: str):
+        """归档超过14天的对话"""
+        cutoff_date = datetime.now() - timedelta(days=14)
+
+        for persona_dir in self._get_persona_dirs(user_id):
+            for conv_file in persona_dir.glob("*.json"):
+                file_date = self._parse_date_from_filename(conv_file)
+                if file_date < cutoff_date:
+                    await self._archive_to_monthly(conv_file, persona_dir)
+                    conv_file.unlink()  # 删除原文件
+
+    async def _archive_to_monthly(self, conv_file: Path, persona_dir: Path):
+        """压缩归档到月度文件"""
+        archive_dir = persona_dir.parent.parent / "archive" / persona_dir.name
+        archive_dir.mkdir(parents=True, exist_ok=True)
+
+        year_month = conv_file.stem[:7]  # 2026-02
+        archive_file = archive_dir / f"{year_month}.json.gz"
+
+        # 追加到压缩文件
+        # ...
+```
+
+---
+
+### 17. 打招呼机制详细设计
+
+#### 17.1 打招呼策略
+
+| 用户状态 | 策略 | 示例 |
+|----------|------|------|
+| 新用户首次 | 主动欢迎 + 自我介绍 | "兄弟们！欢迎来到勇哥的直播间！" |
+| 今日首次（<24h） | 简短问候 | "又见面了！今天想聊点什么？" |
+| 隔天回归（1-3天） | 关心 + 回顾 | "这两天没见，有没有关注AI板块的走势？" |
+| 长时间未登录（>7天） | 热情 + 推荐 | "好久没聊了！最近市场有些新动向..." |
+
+#### 17.2 动态内容生成
+
+```python
+class GreetingGenerator:
+    """打招呼生成器"""
+
+    async def generate_greeting(
+        self,
+        persona: PersonaMetadata,
+        user: UserProfile,
+        last_session: Optional[datetime]
+    ) -> str:
+        """生成个性化打招呼内容"""
+
+        # 1. 计算距离上次对话的时间
+        absence_category = self._categorize_absence(last_session)
+
+        # 2. 获取推荐话题（基于用户偏好 + Persona 知识库最新内容）
+        recommendations = await self._get_recommendations(persona, user)
+
+        # 3. 选择打招呼模板
+        template = self._select_template(persona, absence_category)
+
+        # 4. 填充动态内容
+        greeting = template.format(
+            user_name=user.name or "朋友",
+            absence_desc=self._get_absence_desc(absence_category),
+            recommendations=recommendations,
+            persona_catchphrase=random.choice(persona.common_phrases)
+        )
+
+        return greeting
+
+    def _categorize_absence(self, last_session: Optional[datetime]) -> str:
+        if last_session is None:
+            return "new_user"
+
+        hours = (datetime.now() - last_session).total_seconds() / 3600
+        if hours < 24:
+            return "same_day"
+        elif hours < 72:
+            return "short_absence"
+        else:
+            return "long_absence"
+```
+
+#### 17.3 Persona 风格模板
+
+```yaml
+# config/prompts/greetings/{persona_id}.yaml
+
+new_user:
+  - "各位粉丝朋友们，{user_name}你好！欢迎来找勇哥聊天，有什么问题尽管问！"
+  - "兄弟们！新朋友来了！{user_name}，跟着勇哥吃大肉！"
+
+same_day:
+  - "又见面了{user_name}！还有什么想问的？"
+  - "{user_name}，刚才聊的还没过瘾？继续！"
+
+short_absence:
+  - "{user_name}，这两天没见，{recommendations}，要不要聊聊？"
+  - "兄弟！{absence_desc}，市场又有新动向了！"
+
+long_absence:
+  - "{user_name}！好久没见了！最近{recommendations}，勇哥有话要说！"
+  - "兄弟们！{user_name}回来了！这段时间错过不少，勇哥给你补补课！"
+```
+
+---
+
+### 18. 错误恢复与日志系统
+
+#### 18.1 错误处理策略
+
+```python
+class ErrorHandler:
+    """统一错误处理器"""
+
+    async def handle_llm_error(self, error: Exception, context: dict) -> str:
+        """LLM 调用失败处理"""
+        logger.error(f"LLM error: {error}", extra=context)
+
+        # 1. 重试一次
+        try:
+            return await self._retry_with_same_model(context)
+        except Exception:
+            pass
+
+        # 2. 降级到轻量模型
+        try:
+            return await self._fallback_to_lite_model(context)
+        except Exception:
+            pass
+
+        # 3. 返回固定话术
+        return self._get_fallback_response(context.get("persona"))
+
+    async def handle_chromadb_error(self, error: Exception, context: dict) -> list:
+        """ChromaDB 连接失败处理"""
+        logger.error(f"ChromaDB error: {error}", extra=context)
+
+        # 跳过知识检索，返回空结果
+        return []
+
+    async def handle_data_corruption(self, error: Exception, file_path: Path) -> None:
+        """数据文件损坏处理"""
+        logger.critical(f"Data corruption: {file_path}", exc_info=error)
+
+        # 1. 备份损坏文件
+        backup_path = file_path.with_suffix(f".corrupted.{datetime.now().strftime('%Y%m%d%H%M%S')}")
+        shutil.move(file_path, backup_path)
+
+        # 2. 尝试自动重建
+        await self._rebuild_data_file(file_path)
+```
+
+#### 18.2 日志系统设计
+
+```python
+# common/logger.py
+
+import logging
+import json
+from datetime import datetime
+
+class JSONFormatter(logging.Formatter):
+    """JSON 格式日志"""
+
+    def format(self, record):
+        log_data = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+        }
+
+        # 添加额外上下文
+        if hasattr(record, "user_id"):
+            log_data["user_id"] = record.user_id
+        if hasattr(record, "persona"):
+            log_data["persona"] = record.persona
+        if hasattr(record, "request_id"):
+            log_data["request_id"] = record.request_id
+        if record.exc_info:
+            log_data["exception"] = self.formatException(record.exc_info)
+
+        return json.dumps(log_data, ensure_ascii=False)
+
+def setup_logging(config: LogConfig):
+    """配置日志系统"""
+    root_logger = logging.getLogger()
+    root_logger.setLevel(config.level)
+
+    # 控制台输出
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(JSONFormatter())
+    root_logger.addHandler(console_handler)
+
+    # 文件输出（按日期轮转）
+    file_handler = TimedRotatingFileHandler(
+        config.file_path,
+        when="midnight",
+        interval=1,
+        backupCount=30,
+        encoding="utf-8"
+    )
+    file_handler.setFormatter(JSONFormatter())
+    root_logger.addHandler(file_handler)
+```
+
+#### 18.3 日志配置
+
+```yaml
+# config/settings.yaml
+
+logging:
+  level: INFO
+  file_path: logs/soul.log
+  backup_count: 30
+
+  # 特定模块日志级别
+  module_levels:
+    llm_service: DEBUG
+    chroma_store: DEBUG
+    cache_manager: INFO
+
+  # 敏感信息脱敏
+  redact_fields:
+    - api_key
+    - password
+    - token
+```
+
+#### 18.4 备份策略
+
+```yaml
+# config/settings.yaml
+
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # 每天凌晨2点
+  retention_days: 30
+
+  # 备份内容
+  include:
+    - soul_data/users/
+    - config/
+
+  # 备份位置
+  destination: backups/
+
+  # 压缩
+  compression: gzip
+```
+
+---
+
+### 19. 前端交互详细设计
+
+#### 19.1 状态话术配置
+
+```yaml
+# config/ui/status_phrases.yaml
+
+thinking:
+  - "让我想想..."
+  - "嗯，这个问题..."
+  - "稍等，我整理一下思路..."
+
+searching:
+  - "那个...应该是..."
+  - "嗯...让我找找..."
+  - "等等，我记得有相关内容..."
+
+generating:
+  - ""  # 生成时不显示额外话术，直接输出内容
+```
+
+#### 19.2 引用来源展示
+
+```html
+<!-- 折叠展开组件 -->
+<div class="source-reference">
+  <button @click="expanded = !expanded" class="source-toggle">
+    📎 参考来源 ({{ sources.length }})
+    <span v-if="!expanded">展开</span>
+    <span v-else>收起</span>
+  </button>
+
+  <div v-show="expanded" class="source-list">
+    <div v-for="source in sources" class="source-item">
+      <div class="source-title">{{ source.video_title }}</div>
+      <div class="source-text">{{ source.text }}</div>
+      <div class="source-meta">
+        片段 {{ source.segment }} | 相关度 {{ (1 - source.distance).toFixed(2) }}
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+#### 19.3 调试信息配置
+
+```yaml
+# config/settings.yaml
+
+ui:
+  debug:
+    # 是否显示记忆使用标注（开发时打开，生产环境关闭）
+    show_memory_usage: true
+
+    # 是否显示检索详情
+    show_retrieval_details: true
+
+    # 是否显示意图分析结果
+    show_intent_analysis: true
+```
+
+```html
+<!-- 调试信息展示（仅 debug 模式） -->
+<div v-if="debugMode && message.debug" class="debug-info">
+  <div class="debug-section">
+    <span class="debug-label">意图:</span>
+    <span class="debug-value">{{ message.debug.intent }}</span>
+  </div>
+  <div class="debug-section" v-if="message.debug.memory_used">
+    <span class="debug-label">💭 使用了历史记忆</span>
+  </div>
+</div>
+```
+
+---
+
+### 20. 测试策略详细设计
+
+#### 20.1 测试覆盖范围
+
+| 层级 | 模块 | 测试类型 | 说明 |
+|------|------|----------|------|
+| managers | PersonaManager | 单元测试 | 加载、缓存、搜索 |
+| managers | UserManager | 单元测试 | CRUD、验证 |
+| managers | MemoryManager | 单元测试 | Preview、归档 |
+| managers | CacheManager | 单元测试 | 动态释放、LRU |
+| services | LLMService | 集成测试 | mock + 真实 |
+| services | RetrievalService | 集成测试 | ChromaDB 查询 |
+| services | AnalysisService | 单元测试 | 意图、情绪检测 |
+| core/graph | 各节点 | 单元测试 | 状态转换 |
+| core/graph | 完整工作流 | 集成测试 | 端到端 |
+| storage | Repositories | 单元测试 | 读写、验证 |
+| api | Routes | 集成测试 | 请求响应 |
+
+#### 20.2 测试配置
+
+```python
+# tests/conftest.py
+
+import pytest
+from unittest.mock import AsyncMock
+
+@pytest.fixture
+def mock_llm_service():
+    """Mock LLM 服务"""
+    service = AsyncMock()
+    service.generate.return_value = "这是一个模拟的回复"
+    service.analyze_intent.return_value = {
+        "intent": "question",
+        "confidence": 0.9
+    }
+    return service
+
+@pytest.fixture
+def real_llm_service():
+    """真实 LLM 服务（需要 API Key）"""
+    from services.llm_service import LLMService
+    return LLMService()
+
+# 使用标记区分测试类型
+# pytest -m "not real_llm"  # 只运行 mock 测试
+# pytest -m "real_llm"      # 只运行真实 LLM 测试
+```
+
+#### 20.3 性能基准
+
+```python
+# tests/performance/test_response_time.py
+
+import pytest
+import time
+
+@pytest.mark.performance
+async def test_first_response_time(soul_engine, sample_request):
+    """首响应时间应在 1-3 秒内"""
+    start = time.time()
+
+    async for event in soul_engine.chat(sample_request):
+        if event.type == "token":
+            first_token_time = time.time() - start
+            break
+
+    assert first_token_time < 3.0, f"首响应时间 {first_token_time:.2f}s 超过 3s"
+```
+
+---
+
+### 21. 部署配置
+
+#### 21.1 Dockerfile
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# 安装依赖
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 复制代码
+COPY . .
+
+# 创建数据目录
+RUN mkdir -p soul_data logs
+
+# 暴露端口
+EXPOSE 8004
+
+# 启动命令
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8004"]
+```
+
+#### 21.2 docker-compose.yml
+
+```yaml
+version: '3.8'
+
+services:
+  soul:
+    build: .
+    ports:
+      - "8004:8004"
+    volumes:
+      - ./soul_data:/app/soul_data
+      - ./logs:/app/logs
+      - ../video-analysis-maker/output:/app/maker_output:ro
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - MAKER_OUTPUT_PATH=/app/maker_output
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+
+    # 多实例部署
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 2G
+```
+
+#### 21.3 多实例注意事项
+
+```yaml
+# config/settings.yaml
+
+deployment:
+  # 实例标识（用于日志区分）
+  instance_id: "${HOSTNAME:soul-1}"
+
+  # 共享存储
+  # 多实例时 soul_data 需要使用共享存储（NFS/S3）
+  storage:
+    type: local  # local | nfs | s3
+
+  # 缓存同步
+  # 多实例时需要考虑缓存一致性
+  cache:
+    # 可选：使用 Redis 作为共享缓存
+    backend: memory  # memory | redis
+```
+
+---
+
+## 下一步
+
+1. [x] ~~确认待确认问题 (Q1-Q8)~~ ✅ 全部确认
+2. [ ] 创建项目骨架 (目录结构)
+3. [ ] 实现 PersonaManager (从 maker 加载)
+4. [ ] 实现 LangGraph 工作流
+5. [ ] 实现用户/记忆管理
+6. [ ] 实现 API 层
+7. [ ] 实现前端页面 (soul.html)
+8. [ ] 测试和优化
+
+---
+
+## 设计完成度
+
+| 模块 | 状态 | 说明 |
+|------|------|------|
+| 系统架构 | ✅ 完成 | 整体架构图已确定 |
+| Persona 系统 | ✅ 完成 | 从 maker 加载，支持多类型 |
+| 数据存储 | ✅ 完成 | 目录结构和数据模型已定义 |
+| LangGraph 工作流 | ✅ 完成 | 状态、节点、路由已设计 |
+| Preview 机制 | ✅ 完成 | 触发时机和 Prompt 已定义 |
+| 动态缓存 | ✅ 完成 | SessionCacheManager 已设计 |
+| 配置系统 | ✅ 完成 | 环境变量和 YAML 配置已定义 |
+| API 接口 | ✅ 完成 | 接口列表和 SSE 格式已定义 |
+| 项目结构 | ✅ 完成 | 详细目录结构已定义 |
+| 前端页面 | ✅ 完成 | UI 布局已设计 |
+| 记忆保留策略 | ✅ 完成 | 14天详细+永久Preview+永久长期 |
+| 打招呼机制 | ✅ 完成 | 动态反馈+Persona风格模板 |
+| 错误恢复 | ✅ 完成 | 降级策略+日志系统+备份 |
+| 测试策略 | ✅ 完成 | 除前端外全覆盖，mock+真实 |
+| 部署配置 | ✅ 完成 | Docker+多实例+JSON日志 |
+| 连接助手 | ✅ 完成 | 匿名用户关系建立+偏好收集+注册引导 |
+| Auth 认证 | ✅ 完成 | 匿名/注册/口令/小秘密验证 |
+
+---
+
+## Connection Agent（连接助手）设计
+
+### 概述
+
+连接助手是一个针对匿名用户的关系建立系统。当匿名用户与对话时，系统会自动改写回复，融入关系建立元素，逐步收集用户画像，并在适当时机温柔引导注册。
+
+### 工作流变更
+
+```
+旧: generate/greeting → post_process → update_memory → END
+新: generate/greeting → connection_rewrite → post_process → extract_preferences → update_memory → END
+```
+
+### 新增节点
+
+#### connection_rewrite（连接改写）
+
+- **位置**：generate/greeting 之后，post_process 之前
+- **触发条件**：仅匿名用户（is_anonymous=True）
+- **逻辑**：
+  1. 从 user_preferences.collection_progress 计算还未收集的维度
+  2. 选择本轮目标维度（按顺序取第一个未收集的）
+  3. 使用 connection_agent.txt prompt 模板调用 LLM 改写回复
+  4. 保持人设和风格，自然追加探索性元素
+  5. 超过 nudge_threshold 轮后，温柔提示注册
+- **失败处理**：保留原始回复，不影响用户体验
+- **注册用户**：直接 return {}（NO-OP）
+
+#### extract_preferences（偏好提取）
+
+- **位置**：post_process 之后，update_memory 之前
+- **触发条件**：仅匿名用户，且每 3 轮提取一次（第 2 轮也提取）
+- **逻辑**：
+  1. 调用 LLM 从最近 12 条消息中提取偏好 JSON
+  2. 通过 PreferencesRepository.merge_from_conversation() 合并保存
+  3. 支持的维度：interests, visit_motivation, personality_type, communication_style, recent_topics, knowledge_level
+- **存储位置**：`soul_data/users/{user_id}/preferences.json`
+
+### 新增配置
+
+```yaml
+# config/settings.yaml
+connection_agent:
+  enabled: true           # 是否启用连接助手
+  nudge_threshold: 5      # 多少轮后开始引导注册
+  dimensions:             # 需要收集的用户画像维度
+    - interests
+    - visit_motivation
+    - personality_type
+    - communication_style
+    - recent_topics
+```
+
+### LLM 调用开销
+
+| 用户类型 | connection_rewrite | extract_preferences | 平均额外调用/轮 |
+|----------|-------------------|-------------------|----------------|
+| 匿名用户 | 每轮 1 次 | 每 3 轮 1 次 | ~1.33 |
+| 注册用户 | 0（NO-OP） | 0（NO-OP） | 0 |
+
+全部使用 analysis_model（gemini-2.5-flash），最低成本。
+
+### 新增文件
+
+```
+core/graph/nodes/connection_rewrite.py    # 连接改写节点
+core/graph/nodes/extract_preferences.py   # 偏好提取节点
+config/prompts/connection_agent.txt       # 连接助手 prompt 模板
+storage/models/preferences.py             # 用户偏好模型
+storage/repositories/preferences_repository.py  # 偏好仓库
+```
+
+### 修改文件
+
+```
+common/config.py              # 新增 ConnectionAgentConfig
+core/graph/state.py           # 新增 turn_count 字段
+core/graph/nodes/load_context.py  # 加载匿名状态和偏好
+core/graph/workflow.py        # 注册新节点，重新布线
+core/engine.py                # 注入 PreferencesRepository
+```
+
+### 数据流
+
+```
+1. load_context: 加载 is_anonymous, user_preferences, turn_count
+2. generate/greeting: 生成原始回复
+3. connection_rewrite: (匿名) 用 connection_agent prompt 改写回复
+4. post_process: 保存消息（包含改写后的回复）
+5. extract_preferences: (匿名, 每3轮) 提取偏好并保存
+6. update_memory: 更新 Preview 总结
+```
+
+---
+
+## Auth 认证系统设计
+
+### 用户身份类型
+
+| 类型 | is_anonymous | is_registered | 说明 |
+|------|-------------|--------------|------|
+| 匿名用户 | true | false | 自动创建，名称为"访客_xxxxxx" |
+| 注册用户 | false | true | 设置了名字+口令+小秘密 |
+
+### API 端点
+
+```
+POST /auth/anonymous          # 创建匿名用户
+POST /auth/register           # 完整注册（名字+性别+口令+小秘密）
+POST /auth/upgrade            # 匿名升级为注册用户
+POST /auth/verify/passphrase  # 口令验证
+GET  /auth/verify/challenge   # 获取随机小秘密挑战题
+POST /auth/verify/secret      # 验证小秘密答案
+GET  /auth/secrets/catalog    # 获取小秘密题目目录
+GET  /auth/user/{user_id}     # 获取用户信息
+```
+
+### 小秘密认证
+
+用户注册时选择并回答小秘密题目（14道题：通用6道+男性4道+女性4道），答案 SHA-256 加密存储。登录时可用「口令」或「小秘密挑战」两种方式验证。
+
+---
+
+## 今日完成
+
+- [x] Soul 项目完整设计文档
+- [x] Persona 系统设计（从 maker 加载）
+- [x] 动态缓存管理设计
+- [x] 详细代码结构设计
+- [x] 配置系统设计
+- [x] 通用化设计（领域无关）
+- [x] 确认所有待确认问题 (Q1-Q8)
+- [x] 记忆保留策略详细设计（14天详细+永久Preview+归档）
+- [x] 打招呼机制详细设计（动态反馈+风格模板）
+- [x] 错误恢复与日志系统设计
+- [x] 测试策略详细设计
+- [x] 部署配置设计（Docker+多实例）
+- [x] Connection Agent 连接助手集成（工作流+节点+配置+偏好系统）
+- [x] Auth 认证系统（匿名用户+注册+口令+小秘密验证）
+

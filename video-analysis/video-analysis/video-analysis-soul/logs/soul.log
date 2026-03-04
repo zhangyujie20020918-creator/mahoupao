@@ -1,0 +1,17 @@
+{"timestamp": "2026-02-27T13:53:11.947321+00:00", "level": "INFO", "logger": "main", "message": "Shutting down...", "module": "main", "function": "lifespan", "line": 38}
+{"timestamp": "2026-02-27T13:53:11.947321+00:00", "level": "INFO", "logger": "core.engine", "message": "Stopping SoulEngine...", "module": "engine", "function": "stop", "line": 255}
+{"timestamp": "2026-02-27T13:53:11.947321+00:00", "level": "INFO", "logger": "managers.cache_manager", "message": "Session cache manager stopped", "module": "cache_manager", "function": "stop", "line": 48}
+{"timestamp": "2026-02-27T13:53:11.948320+00:00", "level": "INFO", "logger": "managers.persona_manager", "message": "PersonaManager closed", "module": "persona_manager", "function": "close", "line": 326}
+{"timestamp": "2026-02-27T13:53:11.958185+00:00", "level": "INFO", "logger": "core.engine", "message": "SoulEngine stopped", "module": "engine", "function": "stop", "line": 260}
+{"timestamp": "2026-02-27T13:53:18.365332+00:00", "level": "INFO", "logger": "main", "message": "Starting Video-Analysis-Soul...", "module": "main", "function": "lifespan", "line": 28}
+{"timestamp": "2026-02-27T13:53:18.376047+00:00", "level": "INFO", "logger": "core.engine", "message": "Starting SoulEngine...", "module": "engine", "function": "start", "line": 219}
+{"timestamp": "2026-02-27T13:53:18.376047+00:00", "level": "INFO", "logger": "managers.cache_manager", "message": "Session cache manager started", "module": "cache_manager", "function": "start", "line": 38}
+{"timestamp": "2026-02-27T13:53:18.390296+00:00", "level": "INFO", "logger": "services.embedding_service", "message": "Loading embedding model: BAAI/bge-large-zh-v1.5 (device: cuda)", "module": "embedding_service", "function": "initialize", "line": 46}
+{"timestamp": "2026-02-27T13:53:18.392298+00:00", "level": "INFO", "logger": "sentence_transformers.SentenceTransformer", "message": "Load pretrained SentenceTransformer: BAAI/bge-large-zh-v1.5", "module": "SentenceTransformer", "function": "__init__", "line": 227}
+{"timestamp": "2026-02-27T13:53:22.721311+00:00", "level": "INFO", "logger": "services.embedding_service", "message": "Embedding model loaded: dim=1024", "module": "embedding_service", "function": "initialize", "line": 50}
+{"timestamp": "2026-02-27T13:53:22.722312+00:00", "level": "INFO", "logger": "core.graph.workflow", "message": "LangGraph workflow built successfully", "module": "workflow", "function": "build_workflow", "line": 111}
+{"timestamp": "2026-02-27T13:53:22.724472+00:00", "level": "INFO", "logger": "core.graph.workflow", "message": "Context-only workflow built successfully", "module": "workflow", "function": "build_context_workflow", "line": 169}
+{"timestamp": "2026-02-27T13:53:23.020261+00:00", "level": "INFO", "logger": "httpx", "message": "HTTP Request: GET http://localhost:8003/api/voice/status \"HTTP/1.1 200 OK\"", "module": "_client", "function": "_send_single_request", "line": 1740}
+{"timestamp": "2026-02-27T13:53:23.022261+00:00", "level": "INFO", "logger": "core.engine", "message": "TTS service available: True", "module": "engine", "function": "start", "line": 249}
+{"timestamp": "2026-02-27T13:53:23.022261+00:00", "level": "INFO", "logger": "core.engine", "message": "SoulEngine started successfully", "module": "engine", "function": "start", "line": 251}
+{"timestamp": "2026-02-27T13:53:23.023259+00:00", "level": "INFO", "logger": "main", "message": "Server running on 0.0.0.0:8004", "module": "main", "function": "lifespan", "line": 34}

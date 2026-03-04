@@ -1,0 +1,256 @@
+# 开发进度总结 (2026-02-21)
+
+## 已解决的问题
+
+### 1. 前端超时错误
+- **问题**: 下载完成后显示 "timeout of 300000ms exceeded" 而不是汇总报告
+- **原因**: Vite 代理默认超时5分钟
+- **修复**: `vite.config.ts` 添加代理超时配置 (2小时)
+
+### 2. 浏览器自动关闭
+- **问题**: 下载完成后浏览器关闭，无法复用登录状态
+- **修复**: 创建 `browser_manager.py` 单例管理器，浏览器保持打开
+
+### 3. 作品数 vs 视频数
+- **问题**: 页面显示39个作品，但只有38个视频（1个是图文）
+- **修复**: 区分统计 work_count / video_count / non_video_count
+
+### 4. 自动创建用户文件夹
+- **修复**: 自动提取用户名，创建 `downloads/用户名/` 文件夹
+- 保存 `_metadata.json` (元数据)
+- 保存 `_video_urls.txt` (URL列表)
+
+### 5. 跳过已下载视频
+- **修复**: 检查元数据和文件是否存在，跳过已下载的视频
+- 只下载新增视频，支持增量更新
+
+---
+
+## 修改的文件
+
+| 文件 | 修改内容 |
+|------|----------|
+| `video-analysis-python/src/services/browser_manager.py` | **新建** - 浏览器单例管理器 |
+| `video-analysis-python/src/services/download_service.py` | 重写主下载逻辑 |
+| `video-analysis-web/vite.config.ts` | 添加代理超时配置 |
+| `video-analysis-web/src/types/api.ts` | 添加新字段类型 |
+| `video-analysis-web/src/App.vue` | 添加新状态变量和显示逻辑 |
+| `video-analysis-web/src/style.css` | 添加新样式 |
+
+---
+
+## 新增功能详情
+
+### browser_manager.py
+```python
+# 单例模式浏览器管理器
+# 保持浏览器实例在多次下载间复用
+# 主要方法:
+# - get_page(profile_dir, chrome_path) - 获取页面
+# - keep_alive() - 标记保持打开
+# - close() - 手动关闭
+```
+
+### 用户文件夹结构
+```
+downloads/
+└── 用户名/
+    ├── 视频1.mp4
+    ├── 视频2.mp4
+    ├── _metadata.json      # 元数据
+    └── _video_urls.txt     # URL列表
+```
+
+### _metadata.json 格式
+```json
+{
+  "user_url": "https://www.douyin.com/user/xxx",
+  "username": "用户名",
+  "work_count": 39,
+  "video_count": 38,
+  "non_video_count": 1,
+  "last_updated": "2026-02-21T...",
+  "downloaded_videos": [
+    {"url": "...", "title": "...", "success": true, "file_path": "..."}
+  ]
+}
+```
+
+---
+
+## 明日待测试
+
+1. **验证浏览器保持打开** - 下载完成后浏览器应保持打开
+2. **验证用户文件夹创建** - 检查 `downloads/用户名/` 目录结构
+3. **验证跳过逻辑** - 重新输入相同用户URL，应跳过已下载视频
+4. **验证前端显示** - 确认汇总报告正确显示（不再超时）
+
+---
+
+## 启动命令
+
+```bash
+# 后端
+cd video-analysis-python
+python run_server.py
+
+# 前端
+cd video-analysis-web
+npm run dev
+```
+
+---
+
+## 待修复的问题
+
+### 1. 失败视频重试逻辑 (2026-02-21 已修复)
+- **问题**: 代码中有 `max_retries: int = 3` 和 `max_retry_rounds = 3` 变量定义，但从未使用（重构时丢失）
+- **修复**: 在 `download_service.py` 第722行后添加重试逻辑
+- **实现行为**:
+  1. 第一轮下载完成后，检查 `failed_list` 是否有失败的视频
+  2. 如果有失败，回到用户首页重新滚动获取视频链接
+  3. 遍历失败列表，重新获取视频信息并下载
+  4. 最多重试 3 轮 (`max_retry_rounds = 3`)
+  5. 每轮重试会发送 `type: "retrying"` 事件通知前端
+- **状态**: 已修复
+
+### 2. 前端 axios 超时 (2026-02-21 修复)
+- **问题**: `index.html` 中 axios 请求 `timeout: 300000` (5分钟) 太短
+- **修复**: 改为 `timeout: 7200000` (2小时)
+
+### 3. 前端下载完成后显示详细报告 (2026-02-21 修复)
+- **问题**: 下载完成后只显示"下载成功"，没有详细统计
+- **修复**:
+  - 修改 `routes.py` 返回 `summary` 字段，包含完整统计信息
+  - 修改 `index.html` 添加详细报告卡片，显示：
+    - 用户信息（用户名、视频总数、非视频作品数）
+    - 下载统计（新下载、已存在跳过、失败）
+    - 详细信息（耗时、保存目录）
+    - 失败列表（如有）
+
+### 4. 浏览器手动关闭后无法重启 (2026-02-21 修复)
+- **问题**: 用户手动关闭 Playwright 浏览器后，再次下载报 500 错误
+- **原因**: `browser_manager.py` 中 `_context` 变量仍存在但已失效
+- **修复**: 在 `get_page()` 中添加连接状态检测，自动清理失效资源并重新启动
+
+### 5. 移除平台选择，改为自动检测 (2026-02-21 修复)
+- **问题**: 用户需要手动选择平台，但URL本身已包含平台信息
+- **修复**:
+  - 移除平台下拉选择框
+  - 添加 `detectPlatform()` 方法，根据URL域名自动识别平台
+  - 粘贴URL后自动显示检测到的平台标签（彩色徽章）
+  - 不同平台显示不同颜色：YouTube红、TikTok黑、抖音粉、B站粉、小红书红
+
+---
+
+## 新增项目: video-analysis-cleaner
+
+### 功能
+1. **MP4 → MP3 转换**: 使用 FFmpeg 提取音频
+2. **ASR 语音转文字**: 使用 faster-whisper (GPU 加速)
+
+### 项目结构
+```
+video-analysis-cleaner/
+├── requirements.txt     # 依赖
+├── config.py           # 配置（模型、设备等）
+├── converter.py        # MP4 → MP3
+├── transcriber.py      # ASR 转写
+├── api.py              # FastAPI 服务
+└── run_server.py       # 启动脚本
+```
+
+### 启动命令
+```bash
+cd video-analysis-cleaner
+pip install -r requirements.txt
+python run_server.py
+# 服务运行在 http://localhost:8001
+```
+
+### 前端页面
+- 新增 `video-analysis-web/cleaner.html`
+- 从主页右上角"数据清洗"进入
+- 选择文件夹 → 勾选处理选项 → 开始处理
+- 实时显示处理进度
+
+### 输出格式
+每个音频文件会生成：
+- `.txt` - 纯文本
+- `.srt` - 字幕文件
+- `.json` - 带时间戳的详细结果
+
+---
+
+---
+
+## 新增项目: video-analysis-maker
+
+### 功能
+1. **ASR 文本优化**: 使用 Gemini 1.5 Pro 修正听写错误
+2. **向量数据库**: 使用 ChromaDB + BGE 中文 embedding 构建
+3. **人格画像**: 分析说话风格，生成模拟 prompt
+
+### 项目结构
+```
+video-analysis-maker/
+├── config/
+│   ├── __init__.py
+│   └── settings.py          # 配置管理
+├── processors/
+│   ├── __init__.py
+│   ├── text_optimizer.py    # Gemini ASR 文本优化
+│   ├── embedder.py          # BGE 中文 embedding
+│   └── prompt_generator.py  # 人格画像生成
+├── storage/
+│   ├── __init__.py
+│   └── chroma_manager.py    # ChromaDB 向量数据库
+├── output/                   # 输出目录
+├── .env                      # 配置文件 (已配置 Gemini API Key)
+├── .env.example
+├── requirements.txt
+└── main.py                   # 主程序入口
+```
+
+### 技术选型
+- **LLM**: Gemini 1.5 Pro (文本优化 + 人格分析)
+- **Embedding**: BAAI/bge-large-zh-v1.5 (中文向量化)
+- **Vector DB**: ChromaDB (本地轻量级)
+- **处理粒度**: 按 ASR segments 分段 + 上下文扩展
+
+### 输出物
+处理完成后，每个会生成：
+```
+output/{名}/
+├── optimized_texts/         # 优化后的文本
+│   ├── 视频标题.json        # 含分段信息
+│   └── 视频标题.txt         # 纯文本
+├── chroma_db/               # 向量数据库 (供 RAG 使用)
+├── persona.json             # 人格画像
+└── system_prompt.txt        # 可直接使用的系统 prompt
+```
+
+### 启动命令
+```bash
+cd video-analysis-maker
+conda activate video-analysis
+python main.py --list-souls        # 查看可用
+python main.py                         # 处理所有
+python main.py --soul "小艾财经说 - 抖音"  # 处理指定
+```
+
+### 状态: 代码已完成，待测试
+
+### 下一步: video-analysis-soul
+- 基于 maker 生成的数据，提供 API 服务
+- 让用户可以与""进行对话交互
+- 使用 RAG 检索 + 人格 prompt 实现风格模拟
+
+---
+
+## 相关上下文
+
+- 测试用户主页有39个作品，其中38个视频，1个图文
+- 抖音需要登录才能获取全部视频
+- 验证码/登录检测逻辑已实现，等待用户手动完成
+- 日志保存在 `video-analysis/logs/` 目录

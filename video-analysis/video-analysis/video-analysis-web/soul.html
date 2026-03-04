@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>智能对话 - Video Analysis</title>
+    <style>
+      :root {
+        --primary-color: #f97316;
+        --primary-hover: #ea580c;
+        --bg-color: #1a1a1a;
+        --card-bg: #242424;
+        --text-color: rgba(255, 255, 255, 0.87);
+        --text-muted: rgba(255, 255, 255, 0.6);
+        --border-color: rgba(255, 255, 255, 0.1);
+        --success-color: #10b981;
+        --error-color: #ef4444;
+      }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* ===== Top Bar ===== */
+      .topbar {
+        height: 56px;
+        background: var(--card-bg);
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 1.25rem;
+        flex-shrink: 0;
+      }
+
+      .topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .topbar-logo {
+        font-size: 1.25rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--primary-color), #fb923c);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .soul-dropdown {
+        display: none;
+        position: relative;
+      }
+
+      .soul-dropdown-btn {
+        padding: 0.4rem 0.75rem;
+        background: var(--bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-color);
+        cursor: pointer;
+        font-size: 0.85rem;
+      }
+
+      .nav-link {
+        color: var(--text-muted);
+        text-decoration: none;
+        padding: 0.4rem 0.75rem;
+        border-radius: 6px;
+        transition: all 0.2s;
+        font-size: 0.85rem;
+      }
+
+      .nav-link:hover { background: var(--bg-color); color: var(--text-color); }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+
+      .status-dot.online { background: var(--success-color); }
+      .status-dot.offline { background: var(--error-color); }
+
+      /* ===== Main Layout ===== */
+      .main-layout {
+        display: flex;
+        height: calc(100vh - 56px);
+      }
+
+      /* ===== Sidebar ===== */
+      .sidebar {
+        width: 240px;
+        background: var(--card-bg);
+        border-right: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        overflow: hidden;
+      }
+
+      .sidebar-header {
+        padding: 1rem 1rem 0.75rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .sidebar-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0 0.5rem;
+      }
+
+      .sidebar-item {
+        padding: 0.65rem 0.75rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-bottom: 2px;
+      }
+
+      .sidebar-item:hover { background: var(--bg-color); }
+
+      .sidebar-item.active {
+        background: rgba(249, 115, 22, 0.15);
+        color: var(--primary-color);
+      }
+
+      .sidebar-item-name {
+        font-weight: 500;
+        font-size: 0.9rem;
+      }
+
+      .sidebar-item-info {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+
+      .sidebar-item.active .sidebar-item-info {
+        color: rgba(249, 115, 22, 0.7);
+      }
+
+      /* ===== Chat Area ===== */
+      .chat-area {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .chat-empty {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-muted);
+        gap: 0.75rem;
+      }
+
+      .chat-empty-icon {
+        font-size: 3rem;
+        opacity: 0.3;
+      }
+
+      /* ===== Message Bubbles ===== */
+      .message {
+        display: flex;
+        gap: 0.6rem;
+        max-width: 75%;
+        animation: fadeInUp 0.3s ease;
+      }
+
+      .message-user {
+        align-self: flex-end;
+        flex-direction: row-reverse;
+      }
+
+      .message-assistant {
+        align-self: flex-start;
+        flex-direction: row;
+      }
+
+      .message-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+        font-weight: 600;
+        flex-shrink: 0;
+        margin-top: 1.2rem;
+      }
+
+      .message-user .message-avatar {
+        background: var(--primary-color);
+        color: white;
+      }
+
+      .message-assistant .message-avatar {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-color);
+      }
+
+      .message-body {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      .message-user .message-body { align-items: flex-end; }
+      .message-assistant .message-body { align-items: flex-start; }
+
+      .message-sender {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-bottom: 3px;
+        padding: 0 4px;
+      }
+
+      .message-bubble {
+        padding: 0.75rem 1rem;
+        border-radius: 12px;
+        line-height: 1.6;
+        font-size: 0.95rem;
+        word-break: break-word;
+        white-space: pre-wrap;
+      }
+
+      .message-user .message-bubble {
+        background: var(--primary-color);
+        color: white;
+        border-bottom-right-radius: 4px;
+      }
+
+      .message-assistant .message-bubble {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-bottom-left-radius: 4px;
+      }
+
+      .message-audio {
+        margin-top: 0.5rem;
+        width: 100%;
+        max-width: 300px;
+        height: 36px;
+        border-radius: 18px;
+        opacity: 0.9;
+      }
+
+      /* Speaker icon button */
+      .speaker-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 4px 6px;
+        margin-top: 0.4rem;
+        color: var(--text-muted);
+        transition: color 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75rem;
+        border-radius: 6px;
+      }
+      .speaker-btn:hover { color: var(--primary-color); background: rgba(249,115,22,0.08); }
+      .speaker-btn.playing { color: var(--primary-color); }
+      .speaker-btn.playing svg { animation: pulse-speaker 1.2s ease-in-out infinite; }
+
+      @keyframes pulse-speaker {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.2); opacity: 0.7; }
+      }
+
+      /* Topbar audio control buttons */
+      .audio-controls {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+      .audio-ctrl-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 6px;
+        border-radius: 6px;
+        color: var(--text-muted);
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        position: relative;
+      }
+      .audio-ctrl-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-color); }
+      .audio-ctrl-btn.active { color: var(--primary-color); }
+      .audio-ctrl-btn.disabled { opacity: 0.3; pointer-events: none; }
+      .audio-ctrl-btn .ctrl-tooltip {
+        display: none;
+        position: absolute;
+        bottom: -28px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #333;
+        color: #eee;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        white-space: nowrap;
+      }
+      .audio-ctrl-btn:hover .ctrl-tooltip { display: block; }
+
+      /* Dev toggle (connection agent etc.) */
+      .dev-toggle {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 6px;
+        transition: background 0.2s;
+      }
+      .dev-toggle:hover { background: rgba(255,255,255,0.06); }
+      .toggle-switch {
+        width: 28px;
+        height: 16px;
+        border-radius: 8px;
+        background: rgba(255,255,255,0.15);
+        position: relative;
+        transition: background 0.2s;
+        flex-shrink: 0;
+      }
+      .toggle-switch.on { background: var(--primary-color); }
+      .toggle-switch::after {
+        content: '';
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: white;
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        transition: transform 0.2s;
+      }
+      .toggle-switch.on::after { transform: translateX(12px); }
+
+      /* Grouped assistant messages: reduce gap */
+      .message-assistant.message-grouped {
+        margin-top: -0.6rem;
+      }
+
+      .message-avatar-placeholder {
+        width: 36px;
+        flex-shrink: 0;
+      }
+
+      .message-time {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        margin-top: 4px;
+        padding: 0 4px;
+      }
+
+      .message-sources {
+        margin-top: 0.5rem;
+      }
+
+      .sources-toggle {
+        font-size: 0.8rem;
+        color: var(--primary-color);
+        cursor: pointer;
+        background: none;
+        border: none;
+        padding: 0;
+      }
+
+      .sources-toggle:hover { text-decoration: underline; }
+
+      .sources-list {
+        margin-top: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        background: var(--bg-color);
+        border-radius: 8px;
+        font-size: 0.8rem;
+      }
+
+      .source-item {
+        padding: 0.3rem 0;
+        color: var(--text-muted);
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .source-item:last-child { border-bottom: none; }
+
+      /* ===== Thinking / Typing Indicator ===== */
+      .thinking-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        border-bottom-left-radius: 4px;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        align-self: flex-start;
+        animation: fadeInUp 0.3s ease;
+      }
+
+      .typing-dots {
+        display: flex;
+        gap: 4px;
+      }
+
+      .typing-dots span {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--text-muted);
+        animation: bounce 1.4s infinite both;
+      }
+
+      .typing-dots span:nth-child(2) { animation-delay: 0.16s; }
+      .typing-dots span:nth-child(3) { animation-delay: 0.32s; }
+
+      @keyframes bounce {
+        0%, 80%, 100% { transform: translateY(0); }
+        40% { transform: translateY(-6px); }
+      }
+
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      /* ===== Input Bar ===== */
+      .input-bar {
+        padding: 1rem 1.5rem;
+        background: var(--card-bg);
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        gap: 0.75rem;
+        align-items: flex-end;
+      }
+
+      .input-wrapper {
+        flex: 1;
+        position: relative;
+      }
+
+      .input-textarea {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        background: var(--bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        color: var(--text-color);
+        font-size: 0.95rem;
+        font-family: inherit;
+        resize: none;
+        min-height: 44px;
+        max-height: 120px;
+        line-height: 1.5;
+        transition: border-color 0.2s;
+      }
+
+      .input-textarea:focus {
+        outline: none;
+        border-color: var(--primary-color);
+      }
+
+      .input-textarea::placeholder { color: var(--text-muted); }
+
+      .input-hint {
+        position: absolute;
+        right: 0.75rem;
+        bottom: -1.25rem;
+        font-size: 0.7rem;
+        color: var(--text-muted);
+      }
+
+      .send-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        border: none;
+        background: var(--primary-color);
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        flex-shrink: 0;
+        font-size: 1.1rem;
+      }
+
+      .send-btn:hover:not(:disabled) {
+        background: var(--primary-hover);
+      }
+
+      .send-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      /* ===== Welcome Modal ===== */
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        backdrop-filter: blur(4px);
+      }
+
+      .modal {
+        background: var(--card-bg);
+        border-radius: 16px;
+        padding: 2rem;
+        width: 90%;
+        max-width: 400px;
+        border: 1px solid var(--border-color);
+        animation: fadeInUp 0.3s ease;
+      }
+
+      .modal-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(135deg, var(--primary-color), #fb923c);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .modal-desc {
+        color: var(--text-muted);
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+      }
+
+      .modal-input {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        background: var(--bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-color);
+        font-size: 1rem;
+        margin-bottom: 1rem;
+        transition: border-color 0.2s;
+      }
+
+      .modal-input:focus {
+        outline: none;
+        border-color: var(--primary-color);
+      }
+
+      .modal-btn {
+        width: 100%;
+        padding: 0.75rem;
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .modal-btn:hover:not(:disabled) { background: var(--primary-hover); }
+      .modal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+      /* ===== User Info ===== */
+      .user-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+      }
+
+      .user-name {
+        max-width: 100px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .register-btn {
+        padding: 0.3rem 0.6rem;
+        background: linear-gradient(135deg, var(--primary-color), #fb923c);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s;
+      }
+
+      .register-btn:hover { opacity: 0.85; }
+
+      .modal-row {
+        margin-bottom: 1rem;
+      }
+
+      .modal-label {
+        display: block;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin-bottom: 0.4rem;
+      }
+
+      .gender-options {
+        display: flex;
+        gap: 0.75rem;
+      }
+
+      .gender-option {
+        padding: 0.5rem 1rem;
+        background: var(--bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 0.9rem;
+      }
+
+      .gender-option.selected {
+        border-color: var(--primary-color);
+        color: var(--primary-color);
+        background: rgba(249, 115, 22, 0.1);
+      }
+
+      /* ===== Footer link ===== */
+      .dev-link {
+        text-align: center;
+        padding: 0.5rem;
+        background: var(--card-bg);
+        border-top: 1px solid var(--border-color);
+      }
+
+      .dev-link a {
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 0.7rem;
+        opacity: 0.5;
+      }
+
+      .dev-link a:hover { opacity: 1; }
+
+      /* ===== Responsive ===== */
+      @media (max-width: 768px) {
+        .sidebar { display: none; }
+        .soul-dropdown { display: block; }
+        .nav-link { display: none; }
+        .message { max-width: 85%; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Welcome Modal -->
+      <div v-if="showWelcome" class="modal-overlay">
+        <div class="modal">
+          <h2 class="modal-title">欢迎来到智能对话</h2>
+          <p class="modal-desc">在这里，你可以和 AI 分身畅聊。</p>
+          <button class="modal-btn" :disabled="creatingUser" @click="createAnonymous" style="margin-bottom: 1rem;">
+            {{ creatingUser ? '创建中...' : '直接开始' }}
+          </button>
+          <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+            <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
+            <span style="color: var(--text-muted); font-size: 0.8rem;">或输入昵称</span>
+            <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
+          </div>
+          <input
+            v-model="newUserName"
+            class="modal-input"
+            placeholder="输入你的昵称..."
+            @keydown.enter="createUser"
+          />
+          <button class="modal-btn" :disabled="!newUserName.trim() || creatingUser" @click="createUser" style="background: transparent; border: 1px solid var(--border-color); color: var(--text-color);">
+            {{ creatingUser ? '创建中...' : '用昵称开始' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Register Modal -->
+      <div v-if="showRegister" class="modal-overlay" @click.self="showRegister = false">
+        <div class="modal">
+          <h2 class="modal-title">注册账号</h2>
+          <p class="modal-desc">注册后下次来可以认出你，还能记住你们的聊天记忆。</p>
+          <div class="modal-row">
+            <label class="modal-label">昵称</label>
+            <input v-model="regName" class="modal-input" placeholder="给自己取个名字..." style="margin-bottom: 0;" />
+          </div>
+          <div class="modal-row">
+            <label class="modal-label">性别</label>
+            <div class="gender-options">
+              <span class="gender-option" :class="{ selected: regGender === 'male' }" @click="regGender = 'male'">男</span>
+              <span class="gender-option" :class="{ selected: regGender === 'female' }" @click="regGender = 'female'">女</span>
+            </div>
+          </div>
+          <div class="modal-row">
+            <label class="modal-label">口令（下次登录用）</label>
+            <input v-model="regPassphrase" class="modal-input" type="password" placeholder="设一个简单好记的口令..." style="margin-bottom: 0;" />
+          </div>
+          <button class="modal-btn" :disabled="!regName.trim() || upgrading" @click="doUpgrade">
+            {{ upgrading ? '注册中...' : '完成注册' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Top Bar -->
+      <div class="topbar">
+        <div class="topbar-left">
+          <span class="topbar-logo">智能对话</span>
+          <span class="status-dot" :class="serviceOnline ? 'online' : 'offline'" :title="serviceOnline ? '服务在线' : '服务离线'"></span>
+        </div>
+        <div class="topbar-right">
+          <!-- User info -->
+          <div v-if="userId" class="user-info">
+            <span class="user-name">{{ userName }}</span>
+            <button v-if="isAnonymous" class="register-btn" @click="showRegister = true">注册</button>
+          </div>
+          <!-- Audio controls -->
+          <div class="audio-controls">
+            <button class="audio-ctrl-btn" :class="{ active: audioEnabled }" @click="toggleAudioEnabled" :title="audioEnabled ? '关闭语音' : '开启语音'">
+              <svg v-if="audioEnabled" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+              <span class="ctrl-tooltip">{{ audioEnabled ? '关闭语音' : '开启语音' }}</span>
+            </button>
+            <button class="audio-ctrl-btn" :class="{ active: autoPlayAudio, disabled: !audioEnabled }" @click="toggleAutoPlay" :title="autoPlayAudio ? '关闭自动播放' : '开启自动播放'">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/><path v-if="autoPlayAudio" d="M22 2L22 22" stroke-dasharray="2 3"/></svg>
+              <span class="ctrl-tooltip">{{ autoPlayAudio ? '关闭自动播放' : '开启自动播放' }}</span>
+            </button>
+          </div>
+          <!-- Connection Agent toggle -->
+          <div class="dev-toggle" @click="toggleConnectionAgent" :title="connectionAgentEnabled ? '关闭 Connection Agent' : '开启 Connection Agent'">
+            <div class="toggle-switch" :class="{ on: connectionAgentEnabled }"></div>
+            <span>连接</span>
+          </div>
+          <!-- Mobile soul dropdown -->
+          <div class="soul-dropdown">
+            <select class="soul-dropdown-btn" v-model="currentSoul" @change="selectSoul(currentSoul)">
+              <option value="" disabled>选择</option>
+              <option v-for="b in souls" :key="b.name" :value="b.name">{{ b.name }}</option>
+            </select>
+          </div>
+          <a href="index.html" class="nav-link">下载</a>
+          <a href="cleaner.html" class="nav-link">清洗</a>
+          <a href="maker.html" class="nav-link">训练</a>
+          <a href="voice.html" class="nav-link">声音</a>
+        </div>
+      </div>
+
+      <!-- Main Layout -->
+      <div class="main-layout">
+        <!-- Sidebar -->
+        <div class="sidebar">
+          <div class="sidebar-header">列表</div>
+          <div class="sidebar-list">
+            <div v-if="souls.length === 0" style="padding: 1rem; color: var(--text-muted); font-size: 0.85rem; text-align: center;">
+              暂无
+            </div>
+            <div
+              v-for="b in souls"
+              :key="b.name"
+              class="sidebar-item"
+              :class="{ active: currentSoul === b.name }"
+              @click="selectSoul(b.name)"
+            >
+              <div class="sidebar-item-name">{{ b.name }}</div>
+              <div class="sidebar-item-info">
+                <span v-if="b.has_knowledge_base">知识库</span>
+                <span v-if="b.has_knowledge_base && b.has_system_prompt"> &middot; </span>
+                <span v-if="b.has_system_prompt">人格</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-area">
+          <!-- Empty state -->
+          <div v-if="!currentSoul" class="chat-messages">
+            <div class="chat-empty">
+              <div class="chat-empty-icon">&#128172;</div>
+              <div style="font-size: 1.1rem; font-weight: 500;">选择一个开始对话</div>
+              <div style="font-size: 0.85rem;">从左侧列表选择，或创建新的对话</div>
+            </div>
+          </div>
+
+          <!-- Messages -->
+          <div v-else class="chat-messages" ref="chatMessages">
+            <div v-if="messages.length === 0 && !isThinking" class="chat-empty">
+              <div class="chat-empty-icon">&#128075;</div>
+              <div style="font-size: 1.1rem; font-weight: 500;">和 {{ currentSoul }} 说点什么吧</div>
+            </div>
+
+            <div
+              v-for="msg in messages"
+              :key="msg.id"
+              class="message"
+              :class="['message-' + msg.role, { 'message-grouped': msg.role === 'assistant' && !msg.isFirstInGroup }]"
+              v-show="msg.content || msg.isStreaming"
+            >
+              <!-- Avatar: show for user or first-in-group assistant; placeholder otherwise -->
+              <div v-if="msg.role === 'user' || msg.isFirstInGroup" class="message-avatar">
+                {{ msg.role === 'user' ? userName.charAt(0) : currentSoul.charAt(0) }}
+              </div>
+              <div v-else class="message-avatar-placeholder"></div>
+              <div class="message-body">
+                <div v-if="msg.role === 'user' || msg.isFirstInGroup" class="message-sender">
+                  {{ msg.role === 'user' ? userName : currentSoul }}
+                </div>
+                <div class="message-bubble">{{ msg.content }}</div>
+                <button v-if="msg.audioSrc" class="speaker-btn" :class="{ playing: msg.isPlaying }" @click="togglePlayAudio(msg)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path v-if="!msg.isPlaying" d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path v-if="msg.isPlaying" d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path v-if="msg.isPlaying" d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                  <span style="font-size:0.7rem">{{ msg.isPlaying ? '播放中' : '播放' }}</span>
+                </button>
+                <div v-if="msg.role === 'user' || msg.isFirstInGroup" class="message-time">
+                  {{ formatTime(msg.timestamp) }}
+                </div>
+                <!-- Sources: only on first bubble in group -->
+                <div v-if="msg.sources && msg.sources.length > 0" class="message-sources">
+                  <button class="sources-toggle" @click="toggleSources(msg.id)">
+                    {{ showSources[msg.id] ? '收起参考来源' : '查看参考来源 (' + msg.sources.length + ')' }}
+                  </button>
+                  <div v-if="showSources[msg.id]" class="sources-list">
+                    <div v-for="(src, i) in msg.sources" :key="i" class="source-item">
+                      {{ src }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Thinking indicator -->
+            <div v-if="isThinking" class="thinking-indicator">
+              <div class="typing-dots">
+                <span></span><span></span><span></span>
+              </div>
+              {{ thinkingText }}
+            </div>
+          </div>
+
+          <!-- Input Bar -->
+          <div v-if="currentSoul" class="input-bar">
+            <div class="input-wrapper">
+              <textarea
+                ref="inputBox"
+                v-model="inputText"
+                class="input-textarea"
+                rows="1"
+                placeholder="输入消息..."
+                :disabled="isSending"
+                @keydown="handleKeydown"
+                @input="autoResize"
+              ></textarea>
+              <span class="input-hint">Shift + Enter 换行</span>
+            </div>
+            <button class="send-btn" :disabled="!inputText.trim() || isSending" @click="sendMessage">
+              &#9654;
+            </button>
+          </div>
+
+          <!-- Dev link -->
+          <div class="dev-link">
+            <a href="souldev.html">开发工具</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script>
+      var API = 'http://localhost:8004/api/soul';
+
+      var app = Vue.createApp({
+        data: function() {
+          return {
+            userId: localStorage.getItem('soul_user_id') || '',
+            userName: localStorage.getItem('soul_user_name') || '',
+            showWelcome: false,
+            newUserName: '',
+            creatingUser: false,
+
+            souls: [],
+            currentSoul: '',
+
+            messages: [],
+            inputText: '',
+            isSending: false,
+            isThinking: false,
+            thinkingText: '正在思考...',
+
+            sidebarOpen: true,
+            showSources: {},
+
+            audioEnabled: localStorage.getItem('soul_audio_enabled') !== 'false',
+            autoPlayAudio: localStorage.getItem('soul_auto_play_audio') !== 'false',
+            currentAudio: null,
+            currentPlayingMsgId: null,
+            connectionAgentEnabled: localStorage.getItem('soul_connection_agent') !== 'false',
+
+            isAnonymous: localStorage.getItem('soul_is_anonymous') === 'true',
+            showRegister: false,
+            regName: '',
+            regGender: '',
+            regPassphrase: '',
+            upgrading: false,
+
+            serviceOnline: false,
+            msgIdCounter: 0,
+            groupIdCounter: 0,
+            currentGroupId: null,
+          };
+        },
+        mounted: function() {
+          this.checkService();
+        },
+        methods: {
+          checkService: function() {
+            var vm = this;
+            fetch(API + '/status')
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                vm.serviceOnline = true;
+                vm.loadSouls();
+                if (!vm.userId) {
+                  vm.showWelcome = true;
+                } else {
+                  // 验证本地存的用户是否还存在于后端
+                  vm.validateUser();
+                }
+              })
+              .catch(function() {
+                vm.serviceOnline = false;
+                if (!vm.userId) {
+                  vm.showWelcome = true;
+                }
+              });
+          },
+
+          validateUser: function() {
+            var vm = this;
+            fetch(API + '/auth/user/' + encodeURIComponent(vm.userId))
+              .then(function(r) {
+                if (!r.ok) throw new Error('not found');
+                return r.json();
+              })
+              .then(function(data) {
+                if (data.success && data.data) {
+                  vm.userName = data.data.name;
+                  vm.isAnonymous = data.data.is_anonymous;
+                  localStorage.setItem('soul_user_name', vm.userName);
+                  localStorage.setItem('soul_is_anonymous', String(vm.isAnonymous));
+                } else {
+                  throw new Error('invalid');
+                }
+              })
+              .catch(function() {
+                localStorage.removeItem('soul_user_id');
+                localStorage.removeItem('soul_user_name');
+                localStorage.removeItem('soul_is_anonymous');
+                vm.userId = '';
+                vm.userName = '';
+                vm.isAnonymous = false;
+                vm.showWelcome = true;
+              });
+          },
+
+          createAnonymous: function() {
+            var vm = this;
+            if (vm.creatingUser) return;
+            vm.creatingUser = true;
+            fetch(API + '/auth/anonymous', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                vm.creatingUser = false;
+                if (data.success && data.data) {
+                  vm.userId = data.data.id;
+                  vm.userName = data.data.name;
+                  vm.isAnonymous = true;
+                  localStorage.setItem('soul_user_id', vm.userId);
+                  localStorage.setItem('soul_user_name', vm.userName);
+                  localStorage.setItem('soul_is_anonymous', 'true');
+                  vm.showWelcome = false;
+                }
+              })
+              .catch(function() {
+                vm.creatingUser = false;
+                alert('创建失败，请检查服务是否启动');
+              });
+          },
+
+          createUser: function() {
+            var vm = this;
+            var name = vm.newUserName.trim();
+            if (!name || vm.creatingUser) return;
+
+            vm.creatingUser = true;
+            fetch(API + '/users', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: name }),
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                vm.creatingUser = false;
+                if (data.success && data.data) {
+                  vm.userId = data.data.id;
+                  vm.userName = data.data.name;
+                  vm.isAnonymous = false;
+                  localStorage.setItem('soul_user_id', vm.userId);
+                  localStorage.setItem('soul_user_name', vm.userName);
+                  localStorage.setItem('soul_is_anonymous', 'false');
+                  vm.showWelcome = false;
+                }
+              })
+              .catch(function() {
+                vm.creatingUser = false;
+                alert('创建用户失败，请检查服务是否启动');
+              });
+          },
+
+          doUpgrade: function() {
+            var vm = this;
+            var name = vm.regName.trim();
+            if (!name || vm.upgrading) return;
+            vm.upgrading = true;
+            fetch(API + '/auth/upgrade', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                user_id: vm.userId,
+                name: name,
+                gender: vm.regGender || 'unknown',
+                passphrase: vm.regPassphrase || '',
+                secrets: [],
+              }),
+            })
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                vm.upgrading = false;
+                if (data.success && data.data) {
+                  vm.userName = data.data.name;
+                  vm.isAnonymous = false;
+                  vm.showRegister = false;
+                  localStorage.setItem('soul_user_name', vm.userName);
+                  localStorage.setItem('soul_is_anonymous', 'false');
+                }
+              })
+              .catch(function() {
+                vm.upgrading = false;
+                alert('注册失败，请稍后重试');
+              });
+          },
+
+          loadSouls: function() {
+            var vm = this;
+            fetch(API + '/souls')
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                if (data.success && data.data) {
+                  vm.souls = data.data.personas || [];
+                }
+              })
+              .catch(function() {});
+          },
+
+          selectSoul: function(name) {
+            var vm = this;
+            vm.currentSoul = name;
+            vm.messages = [];
+            vm.showSources = {};
+            if (vm.userId && name) {
+              vm.loadHistory(vm.userId, name);
+            }
+          },
+
+          loadHistory: function(userId, soulName) {
+            var vm = this;
+            fetch(API + '/history/' + encodeURIComponent(userId) + '/' + encodeURIComponent(soulName))
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                if (data.success && data.data && data.data.today) {
+                  var msgs = data.data.today.messages || [];
+                  vm.messages = msgs.map(function(m) {
+                    vm.msgIdCounter++;
+                    return {
+                      id: vm.msgIdCounter,
+                      role: m.role === 'user' ? 'user' : 'assistant',
+                      content: m.content || '',
+                      timestamp: m.timestamp || null,
+                      sources: m.sources || [],
+                      audioSrc: null,
+                      isStreaming: false,
+                      groupId: null,
+                      sentenceId: null,
+                      isFirstInGroup: true,
+                    };
+                  });
+                  vm.scrollToBottom();
+                }
+              })
+              .catch(function() {});
+          },
+
+          sendMessage: function() {
+            var vm = this;
+            var text = vm.inputText.trim();
+            if (!text || vm.isSending) return;
+
+            // Append user message
+            vm.msgIdCounter++;
+            vm.messages.push({
+              id: vm.msgIdCounter,
+              role: 'user',
+              content: text,
+              timestamp: new Date().toISOString(),
+              sources: [],
+              audioSrc: null,
+              isStreaming: false,
+              isPlaying: false,
+              groupId: null,
+              sentenceId: null,
+              isFirstInGroup: true,
+            });
+
+            // Create a group ID for assistant response bubbles
+            vm.groupIdCounter++;
+            var groupId = vm.groupIdCounter;
+            vm.currentGroupId = groupId;
+
+            vm.inputText = '';
+            vm.isSending = true;
+            vm.isThinking = true;
+            vm.thinkingText = '正在思考...';
+            vm.scrollToBottom();
+
+            // Reset textarea height
+            if (vm.$refs.inputBox) {
+              vm.$refs.inputBox.style.height = 'auto';
+            }
+
+            fetch(API + '/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                user_id: vm.userId,
+                soul: vm.currentSoul,
+                message: text,
+                enable_tts: vm.audioEnabled,
+                enable_connection_agent: vm.connectionAgentEnabled,
+              }),
+            }).then(function(response) {
+              var reader = response.body.getReader();
+              var decoder = new TextDecoder();
+              var buffer = '';
+              var currentEvent = '';
+
+              function processLines(text) {
+                buffer += text;
+                var lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (var i = 0; i < lines.length; i++) {
+                  var line = lines[i].trim();
+                  if (line.startsWith('event:')) {
+                    currentEvent = line.substring(6).trim();
+                  } else if (line.startsWith('data:')) {
+                    var dataStr = line.substring(5).trim();
+                    try {
+                      var data = JSON.parse(dataStr);
+                      vm.handleSSEEvent(currentEvent, data, groupId);
+                    } catch (e) {
+                      console.error('[SSE] JSON parse failed for event:', currentEvent, 'error:', e.message, 'data length:', dataStr.length);
+                    }
+                  }
+                }
+              }
+
+              function read() {
+                reader.read().then(function(result) {
+                  if (result.done) {
+                    if (buffer.trim()) {
+                      processLines('\n');
+                    }
+                    vm.isSending = false;
+                    vm.isThinking = false;
+                    // Mark all group messages done
+                    vm.messages.forEach(function(m) {
+                      if (m.groupId === groupId) m.isStreaming = false;
+                    });
+                    return;
+                  }
+                  processLines(decoder.decode(result.value, { stream: true }));
+                  read();
+                }).catch(function() {
+                  vm.isSending = false;
+                  vm.isThinking = false;
+                  vm.messages.forEach(function(m) {
+                    if (m.groupId === groupId) m.isStreaming = false;
+                  });
+                });
+              }
+              read();
+            }).catch(function(e) {
+              vm.isSending = false;
+              vm.isThinking = false;
+              // Push error as a message bubble
+              vm.msgIdCounter++;
+              vm.messages.push({
+                id: vm.msgIdCounter,
+                role: 'assistant',
+                content: '发送失败: ' + (e.message || '网络错误'),
+                timestamp: new Date().toISOString(),
+                sources: [],
+                audioSrc: null,
+                isStreaming: false,
+                isPlaying: false,
+                groupId: groupId,
+                sentenceId: 0,
+                isFirstInGroup: true,
+              });
+            });
+          },
+
+          handleSSEEvent: function(event, data, groupId) {
+            var vm = this;
+
+            if (event === 'thinking') {
+              vm.isThinking = true;
+              vm.thinkingText = data.message || '正在分析...';
+            } else if (event === 'searching') {
+              vm.isThinking = true;
+              vm.thinkingText = data.message || '正在检索...';
+            } else if (event === 'message_start') {
+              vm.isThinking = false;
+              var sid = data.sentence_id != null ? data.sentence_id : 0;
+              var isFirst = !vm.messages.some(function(m) { return m.groupId === groupId; });
+              vm.msgIdCounter++;
+              vm.messages.push({
+                id: vm.msgIdCounter,
+                role: 'assistant',
+                content: '',
+                timestamp: new Date().toISOString(),
+                sources: [],
+                audioSrc: null,
+                isStreaming: true,
+                isPlaying: false,
+                groupId: groupId,
+                sentenceId: sid,
+                isFirstInGroup: isFirst,
+              });
+              vm.scrollToBottom();
+            } else if (event === 'token') {
+              vm.isThinking = false;
+              var sid = data.sentence_id != null ? data.sentence_id : 0;
+              var msg = vm.findSentenceMessage(groupId, sid);
+              if (!msg) {
+                // Fallback: create bubble if message_start was missed
+                var isFirst = !vm.messages.some(function(m) { return m.groupId === groupId; });
+                vm.msgIdCounter++;
+                vm.messages.push({
+                  id: vm.msgIdCounter,
+                  role: 'assistant',
+                  content: '',
+                  timestamp: new Date().toISOString(),
+                  sources: [],
+                  audioSrc: null,
+                  isStreaming: true,
+                  isPlaying: false,
+                  groupId: groupId,
+                  sentenceId: sid,
+                  isFirstInGroup: isFirst,
+                });
+                msg = vm.messages[vm.messages.length - 1];
+              }
+              msg.content += (data.content || data.token || '');
+              vm.scrollToBottom();
+            } else if (event === 'sentence_end') {
+              var sid = data.sentence_id != null ? data.sentence_id : 0;
+              var msg = vm.findSentenceMessage(groupId, sid);
+              if (msg) {
+                msg.isStreaming = false;
+              }
+            } else if (event === 'audio') {
+              if (!vm.audioEnabled) return;
+              var sid = data.sentence_id != null ? data.sentence_id : 0;
+              console.log('[SSE] audio event: sentence_id=' + sid + ', base64_len=' + (data.audio_base64 ? data.audio_base64.length : 0));
+              var msg = vm.findSentenceMessage(groupId, sid);
+              if (!msg) {
+                console.warn('[SSE] audio: no message found for groupId=' + groupId + ', sentenceId=' + sid);
+              }
+              if (msg && data.audio_base64) {
+                var fmt = data.format || 'wav';
+                // 用 Blob URL 代替 data URI，避免浏览器大小限制
+                try {
+                  var raw = atob(data.audio_base64);
+                  var bytes = new Uint8Array(raw.length);
+                  for (var bi = 0; bi < raw.length; bi++) bytes[bi] = raw.charCodeAt(bi);
+                  var blob = new Blob([bytes], { type: 'audio/' + fmt });
+                  msg.audioSrc = URL.createObjectURL(blob);
+                  console.log('[SSE] audio: set blob URL for sentence ' + sid);
+                } catch (blobErr) {
+                  // fallback to data URI
+                  msg.audioSrc = 'data:audio/' + fmt + ';base64,' + data.audio_base64;
+                  console.warn('[SSE] audio: blob failed, using data URI', blobErr);
+                }
+                // 自动播放
+                if (vm.autoPlayAudio) {
+                  vm.$nextTick(function() { vm.togglePlayAudio(msg); });
+                }
+                vm.scrollToBottom();
+              }
+            } else if (event === 'done') {
+              console.log('[SSE] done event received');
+              vm.isThinking = false;
+              vm.isSending = false;
+              vm.messages.forEach(function(m) {
+                if (m.groupId === groupId) m.isStreaming = false;
+              });
+              // Attach sources to the first bubble in this group
+              if (data.sources && data.sources.length > 0) {
+                var firstMsg = vm.messages.find(function(m) { return m.groupId === groupId; });
+                if (firstMsg) firstMsg.sources = data.sources;
+              }
+              vm.scrollToBottom();
+            } else if (event === 'error') {
+              vm.isThinking = false;
+              vm.isSending = false;
+              var errMsg = vm.messages.find(function(m) { return m.groupId === groupId; });
+              if (!errMsg) {
+                vm.msgIdCounter++;
+                vm.messages.push({
+                  id: vm.msgIdCounter,
+                  role: 'assistant',
+                  content: '',
+                  timestamp: new Date().toISOString(),
+                  sources: [],
+                  audioSrc: null,
+                  isStreaming: false,
+                  isPlaying: false,
+                  groupId: groupId,
+                  sentenceId: 0,
+                  isFirstInGroup: true,
+                });
+                errMsg = vm.messages[vm.messages.length - 1];
+              }
+              errMsg.content = '错误: ' + (data.message || '未知错误');
+              errMsg.isStreaming = false;
+              vm.scrollToBottom();
+            }
+          },
+
+          findMessage: function(id) {
+            for (var i = 0; i < this.messages.length; i++) {
+              if (this.messages[i].id === id) return this.messages[i];
+            }
+            return null;
+          },
+
+          findSentenceMessage: function(groupId, sentenceId) {
+            for (var i = 0; i < this.messages.length; i++) {
+              if (this.messages[i].groupId === groupId && this.messages[i].sentenceId === sentenceId) {
+                return this.messages[i];
+              }
+            }
+            return null;
+          },
+
+          toggleConnectionAgent: function() {
+            this.connectionAgentEnabled = !this.connectionAgentEnabled;
+            localStorage.setItem('soul_connection_agent', String(this.connectionAgentEnabled));
+          },
+
+          toggleAudioEnabled: function() {
+            this.audioEnabled = !this.audioEnabled;
+            localStorage.setItem('soul_audio_enabled', String(this.audioEnabled));
+            if (!this.audioEnabled) {
+              this.stopCurrentAudio();
+            }
+          },
+
+          toggleAutoPlay: function() {
+            if (!this.audioEnabled) return;
+            this.autoPlayAudio = !this.autoPlayAudio;
+            localStorage.setItem('soul_auto_play_audio', String(this.autoPlayAudio));
+          },
+
+          togglePlayAudio: function(msg) {
+            var vm = this;
+            // 如果点击的是当前正在播放的消息 → 停止
+            if (vm.currentPlayingMsgId === msg.id && vm.currentAudio) {
+              vm.stopCurrentAudio();
+              return;
+            }
+            // 停止之前的播放
+            vm.stopCurrentAudio();
+            // 创建新的 Audio 并播放
+            var audio = new Audio(msg.audioSrc);
+            vm.currentAudio = audio;
+            vm.currentPlayingMsgId = msg.id;
+            msg.isPlaying = true;
+            audio.play().catch(function(e) {
+              console.warn('Audio play failed:', e);
+              msg.isPlaying = false;
+              vm.currentAudio = null;
+              vm.currentPlayingMsgId = null;
+            });
+            audio.addEventListener('ended', function() {
+              msg.isPlaying = false;
+              vm.currentAudio = null;
+              vm.currentPlayingMsgId = null;
+            });
+          },
+
+          stopCurrentAudio: function() {
+            if (this.currentAudio) {
+              this.currentAudio.pause();
+              this.currentAudio.currentTime = 0;
+              this.currentAudio = null;
+            }
+            if (this.currentPlayingMsgId != null) {
+              var playingMsg = this.findMessage(this.currentPlayingMsgId);
+              if (playingMsg) playingMsg.isPlaying = false;
+              this.currentPlayingMsgId = null;
+            }
+          },
+
+          toggleSources: function(msgId) {
+            this.showSources[msgId] = !this.showSources[msgId];
+          },
+
+          scrollToBottom: function() {
+            var vm = this;
+            vm.$nextTick(function() {
+              var el = vm.$refs.chatMessages;
+              if (el) {
+                el.scrollTop = el.scrollHeight;
+              }
+            });
+          },
+
+          formatTime: function(ts) {
+            if (!ts) return '';
+            var d = new Date(ts);
+            var h = String(d.getHours()).padStart(2, '0');
+            var m = String(d.getMinutes()).padStart(2, '0');
+            return h + ':' + m;
+          },
+
+          handleKeydown: function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              this.sendMessage();
+            }
+          },
+
+          autoResize: function(e) {
+            var el = e.target;
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+          },
+        },
+      });
+
+      app.mount('#app');
+    </script>
+  </body>
+</html>

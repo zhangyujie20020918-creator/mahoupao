@@ -1,0 +1,32 @@
+ti# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# 环境
+.env
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# 系统
+.DS_Store
+Thumbs.db
+nul
+
+video-analysis/video-analysis/archive/*
+video-analysis/video-analysis/downloads/*
+video-analysis/video-analysis/video-analysis-cleaner/models/*
+video-analysis/video-analysis/video-analysis-maker/output/*
+video-analysis/video-analysis/video-analysis-voice-cloning/datasets/*
+video-analysis/video-analysis/video-analysis-voice-cloning/models/*
+video-analysis/video-analysis/video-analysis-maker/output/*
+video-analysis/video-analysis/video-analysis-soul/*
+video-analysis/video-analysis/video-analysis-soul/logs/soul.log
+video-analysis/video-analysis/video-analysis-soul/logs/soul.log
+video-analysis/video-analysis/logs/*

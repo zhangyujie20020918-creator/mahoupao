@@ -1,0 +1,27 @@
+# FastAPI
+fastapi>=0.110.0
+uvicorn>=0.29.0
+pydantic>=2.0.0
+
+# Audio Processing
+pydub>=0.25.1
+librosa>=0.10.0
+soundfile>=0.12.0
+
+# Machine Learning
+torch>=2.2.0
+torchaudio>=2.2.0
+transformers>=4.40.0
+
+# Chinese Text Processing
+jieba>=0.42.1
+cn2an>=0.5.22
+pypinyin>=0.51.0
+g2p-en>=2.1.0
+LangSegment>=0.2.0
+
+# Hugging Face
+huggingface-hub>=0.22.0
+
+# Utilities
+tqdm>=4.66.0

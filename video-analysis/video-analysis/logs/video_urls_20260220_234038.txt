@@ -1,0 +1,44 @@
+# 抖音视频URL提取日志
+# 时间: 2026-02-20T23:40:38.641697
+# 用户主页: https://www.douyin.com/user/MS4wLjABAAAA_B5qkAzuqg40QLAdzkXmjwXwst0WMymAYkp0XV6goPU
+# 视频数量: 38
+# ==================================================
+
+001. https://www.douyin.com/video/7607813192362330789
+002. https://www.douyin.com/video/7607010894380580517
+003. https://www.douyin.com/video/7603598286218672805
+004. https://www.douyin.com/video/7608473858638649019
+005. https://www.douyin.com/video/7608404039982784869
+006. https://www.douyin.com/video/7608153151631624805
+007. https://www.douyin.com/video/7608142613879760570
+008. https://www.douyin.com/video/7607301371658561189
+009. https://www.douyin.com/video/7606248099245912753
+010. https://www.douyin.com/video/7606198428457456293
+011. https://www.douyin.com/video/7606149803017425637
+012. https://www.douyin.com/video/7605959615599420602
+013. https://www.douyin.com/video/7605930738529725285
+014. https://www.douyin.com/video/7605868661786754033
+015. https://www.douyin.com/video/7605837914928412072
+016. https://www.douyin.com/video/7605777193519705265
+017. https://www.douyin.com/video/7605468016483463802
+018. https://www.douyin.com/video/7605404937266837157
+019. https://www.douyin.com/video/7605181126340456421
+020. https://www.douyin.com/video/7605097220714561785
+021. https://www.douyin.com/video/7605084285540188645
+022. https://www.douyin.com/video/7605035507235524965
+023. https://www.douyin.com/video/7604825861329815793
+024. https://www.douyin.com/video/7604764354228043377
+025. https://www.douyin.com/video/7604725992721094778
+026. https://www.douyin.com/video/7604667368543017061
+027. https://www.douyin.com/video/7603673204192683185
+028. https://www.douyin.com/video/7603611438868309477
+029. https://www.douyin.com/video/7603551659201987429
+030. https://www.douyin.com/video/7603281450275755707
+031. https://www.douyin.com/video/7603228655876147941
+032. https://www.douyin.com/video/7603182242567538085
+033. https://www.douyin.com/video/7602975768185464421
+034. https://www.douyin.com/video/7602869565818848506
+035. https://www.douyin.com/video/7602861559853598181
+036. https://www.douyin.com/video/7602807177170405297
+037. https://www.douyin.com/video/7602612366875316657
+038. https://www.douyin.com/video/7602580220064160741

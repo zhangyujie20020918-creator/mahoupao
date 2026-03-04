@@ -1,0 +1,6 @@
+{
+  "blogger_name": "小艾财经说 - 抖音",
+  "epochs_gpt": 5,
+  "epochs_sovits": 3,
+  "batch_size": 4
+}
